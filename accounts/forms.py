@@ -16,6 +16,23 @@ class PartnerRegistrationForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email Address'}),
         }
 
+    def clean_phone_number(self):
+        phone = self.cleaned_data.get('phone_number')
+        import re
+        cleaned_number = re.sub(r'[\s\-\+]', '', phone)
+        if not cleaned_number.isdigit():
+            raise forms.ValidationError("Phone number can only contain digits, spaces, -, or +.")
+        if len(cleaned_number) < 10 or len(cleaned_number) > 15:
+            raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        return phone
+
+    def clean_company_name(self):
+        name = self.cleaned_data.get('company_name')
+        import re
+        if not re.search(r'[a-zA-Z]', name):
+            raise forms.ValidationError("Company name must contain alphabets.")
+        return name
+
     def clean(self):
         cleaned_data = super().clean()
         password = cleaned_data.get("password")
