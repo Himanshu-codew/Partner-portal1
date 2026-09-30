@@ -11,10 +11,11 @@ class UserForm(forms.ModelForm):
     
     class Meta:
         model = User
-        fields = ['username', 'email', 'password', 'is_staff', 'is_superuser', 'is_active']
+        fields = ['username', 'email', 'password', 'groups', 'is_staff', 'is_superuser', 'is_active']
         widgets = {
             'username': forms.TextInput(attrs={'class': 'form-control'}),
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
+            'groups': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 5}),
             'is_staff': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_superuser': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
             'is_active': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
@@ -27,14 +28,16 @@ class UserForm(forms.ModelForm):
             user.set_password(self.cleaned_data["password"])
         if commit:
             user.save()
+            self.save_m2m() # Required when saving a modelform with many-to-many fields (groups)
         return user
 
 class GroupForm(forms.ModelForm):
     class Meta:
         model = Group
-        fields = ['name']
+        fields = ['name', 'permissions']
         widgets = {
             'name': forms.TextInput(attrs={'class': 'form-control'}),
+            'permissions': forms.SelectMultiple(attrs={'class': 'form-select', 'size': 15}),
         }
 
 class PartnerProfileForm(forms.ModelForm):
