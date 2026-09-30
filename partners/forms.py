@@ -3,7 +3,11 @@ from django.contrib.auth.models import User, Group
 from .models import PartnerProfile
 
 class UserForm(forms.ModelForm):
-    password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control'}))
+    password = forms.CharField(
+        widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Leave blank to keep current password'}),
+        required=False,
+        help_text="Leave blank if you don't want to change the password."
+    )
     
     class Meta:
         model = User
@@ -18,7 +22,9 @@ class UserForm(forms.ModelForm):
         
     def save(self, commit=True):
         user = super().save(commit=False)
-        user.set_password(self.cleaned_data["password"])
+        # Only set the password if a new one was provided
+        if self.cleaned_data.get("password"):
+            user.set_password(self.cleaned_data["password"])
         if commit:
             user.save()
         return user
