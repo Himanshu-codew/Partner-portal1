@@ -1,0 +1,80 @@
+{% extends 'base.html' %}
+
+{% block title %}My Orders | Partner Portal{% endblock %}
+
+{% block content %}
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <h2><i class="bi bi-cart-check"></i> Orders</h2>
+        {% if request.user.is_staff %}
+        <a href="{% url 'order_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add New Order</a>
+        {% endif %}
+    </div>
+    
+    <div class="card shadow-sm border-0">
+        <div class="card-body">
+            <div class="table-responsive">
+                <table class="table table-hover align-middle">
+                    <thead class="table-light">
+                        <tr>
+                            <th>Order Details</th>
+                            <th>Amount</th>
+                            <th>Status</th>
+                            <th>Date</th>
+                            {% if request.user.is_staff %}
+                            <th>Action</th>
+                            {% endif %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for order in orders %}
+                        <tr>
+                            <td class="fw-bold">
+                                <span class="text-primary">#{{ order.order_number }}</span>
+                                {% if request.user.is_staff and order.partner %}
+                                <br><small class="text-primary fw-normal"><i class="bi bi-person"></i> Partner: {{ order.partner.user.username }}</small>
+                                {% endif %}
+                            </td>
+                            <td>₹ {{ order.amount }}</td>
+                            <td>
+                                {% if order.status == 'PENDING' %}
+                                    <span class="badge bg-warning text-dark">Pending</span>
+                                {% elif order.status == 'COMPLETED' %}
+                                    <span class="badge bg-success">Completed</span>
+                                {% elif order.status == 'CANCELLED' %}
+                                    <span class="badge bg-danger">Cancelled</span>
+                                {% endif %}
+                            </td>
+                            <td>{{ order.created_at|date:"M d, Y" }}</td>
+                            {% if request.user.is_staff %}
+                            <td>
+                                <div class="d-flex gap-2">
+                                    <form action="{% url 'order_update_status' order.id %}" method="post" class="d-flex gap-2">
+                                        {% csrf_token %}
+                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                            <option value="PENDING" {% if order.status == 'PENDING' %}selected{% endif %}>Pending</option>
+                                            <option value="COMPLETED" {% if order.status == 'COMPLETED' %}selected{% endif %}>Completed</option>
+                                            <option value="CANCELLED" {% if order.status == 'CANCELLED' %}selected{% endif %}>Cancelled</option>
+                                        </select>
+                                    </form>
+                                    <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                                    <form action="{% url 'order_delete' order.pk %}" method="post" onsubmit="return confirm('Are you sure you want to delete this order?');">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                    </form>
+                                </div>
+                            </td>
+                            {% endif %}
+                        </tr>
+                        {% empty %}
+                        <tr>
+                            <td colspan="5" class="text-center py-4 text-muted">
+                                No orders generated yet.
+                            </td>
+                        </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

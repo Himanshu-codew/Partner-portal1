@@ -1,0 +1,65 @@
+{% extends 'base.html' %}
+
+{% block title %}Resources | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2><i class="bi bi-file-earmark-text"></i> Resources & Announcements</h2>
+</div>
+
+<div class="row">
+    <!-- Announcements Column -->
+    <div class="col-md-7 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white fw-bold text-primary d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-megaphone"></i> Latest Announcements</span>
+                {% if request.user.is_staff %}
+                <a href="{% url 'announcement_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-circle"></i> Add</a>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                {% for announcement in announcements %}
+                <div class="mb-4 pb-3 border-bottom">
+                    <h5 class="fw-bold">{{ announcement.title }}</h5>
+                    <small class="text-muted d-block mb-2"><i class="bi bi-calendar3"></i> {{ announcement.created_at|date:"M d, Y" }}</small>
+                    <p class="mb-0">{{ announcement.content|linebreaksbr }}</p>
+                </div>
+                {% empty %}
+                <div class="text-center py-5 text-muted">
+                    No active announcements at this time.
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    <!-- Documents Column -->
+    <div class="col-md-5 mb-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white fw-bold text-success d-flex justify-content-between align-items-center">
+                <span><i class="bi bi-folder2-open"></i> Important Documents</span>
+                {% if request.user.is_staff %}
+                <a href="{% url 'document_create' %}" class="btn btn-sm btn-success"><i class="bi bi-plus-circle"></i> Add</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                <ul class="list-group list-group-flush">
+                    {% for doc in documents %}
+                    <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                        <div>
+                            <div class="fw-bold">{{ doc.title }}</div>
+                            <small class="text-muted">Added: {{ doc.uploaded_at|date:"M d, Y" }}</small>
+                        </div>
+                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i> Download</a>
+                    </li>
+                    {% empty %}
+                    <li class="list-group-item text-center py-4 text-muted border-bottom-0">
+                        No documents available yet.
+                    </li>
+                    {% endfor %}
+                </ul>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

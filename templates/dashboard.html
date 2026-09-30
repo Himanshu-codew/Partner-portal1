@@ -1,0 +1,74 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2>Welcome back, {{ request.user.first_name|default:request.user.username }}!</h2>
+    <span class="badge bg-success p-2">Partner Account</span>
+</div>
+
+{% if not request.user.is_staff and not request.user.partner_profile.is_approved %}
+<div class="alert alert-warning shadow-sm border-0 mb-4">
+    <h4 class="alert-heading"><i class="bi bi-hourglass-split"></i> Account Pending Approval</h4>
+    <p>Your partner account has been created successfully, but it is currently waiting for administrator approval. You will not be able to add leads, view orders, or access resources until your account is approved.</p>
+    <hr>
+    <p class="mb-0">Please contact support if you have been waiting for more than 48 hours.</p>
+</div>
+{% endif %}
+
+<div class="row">
+    <!-- Stat Card 1 -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Total Leads</div>
+                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ leads_count }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stat Card 2 -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Total Orders</div>
+                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ orders_count }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stat Card 3 -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-0 border-start border-info border-4 h-100">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Earnings</div>
+                <div class="h3 mb-0 font-weight-bold text-gray-800">₹ {{ earnings }}</div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Stat Card 4 -->
+    <div class="col-md-3 mb-4">
+        <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
+            <div class="card-body">
+                <div class="text-muted small fw-bold text-uppercase mb-1">Pending Tickets</div>
+                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ tickets_count }}</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-12">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-white fw-bold">
+                Recent Activity
+            </div>
+            <div class="card-body text-center py-5 text-muted">
+                No recent activity to show yet. Add a lead to get started!
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

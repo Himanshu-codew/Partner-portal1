@@ -1,0 +1,50 @@
+{% extends 'base.html' %}
+
+{% block title %}My Commissions | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-wallet2"></i> Commissions</h2>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Order Number</th>
+                        <th>Order Amount</th>
+                        <th>Commission</th>
+                        <th>Commission Status</th>
+                        <th>Date</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for order in orders %}
+                    <tr>
+                        <td class="fw-bold text-primary">#{{ order.order_number }}</td>
+                        <td>₹ {{ order.amount }}</td>
+                        <td class="text-success fw-bold">₹ {{ order.commission_amount }}</td>
+                        <td>
+                            {% if order.is_commission_paid %}
+                                <span class="badge bg-success">Paid</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ order.created_at|date:"M d, Y" }}</td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="5" class="text-center py-4 text-muted">
+                            No commissions generated yet. Once a lead converts, the commission will appear here.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

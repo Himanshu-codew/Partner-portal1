@@ -1,0 +1,83 @@
+{% extends 'base.html' %}
+
+{% block title %}My Leads | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-person-lines-fill"></i> My Leads</h2>
+    {% if not request.user.is_staff %}
+    <a href="{% url 'lead_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add New Lead</a>
+    {% endif %}
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-body">
+        <div class="table-responsive">
+            <table class="table table-hover align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Customer Name</th>
+                        <th>Phone</th>
+                        <th>Product Interest</th>
+                        <th>Status</th>
+                        <th>Date Added</th>
+                        <th>Action</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for lead in leads %}
+                    <tr>
+                        <td class="fw-bold">
+                            {{ lead.customer_name }}
+                            {% if request.user.is_staff and lead.partner %}
+                            <br><small class="text-muted fw-normal"><i class="bi bi-person"></i> Partner: {{ lead.partner.user.username }}</small>
+                            {% endif %}
+                        </td>
+                        <td>{{ lead.customer_phone }}</td>
+                        <td>{{ lead.product_interest }}</td>
+                        <td>
+                            {% if lead.status == 'NEW' %}
+                                <span class="badge bg-primary">New</span>
+                            {% elif lead.status == 'IN_PROGRESS' %}
+                                <span class="badge bg-warning text-dark">In Progress</span>
+                            {% elif lead.status == 'CONVERTED' %}
+                                <span class="badge bg-success">Converted</span>
+                            {% elif lead.status == 'LOST' %}
+                                <span class="badge bg-danger">Lost</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ lead.created_at|date:"M d, Y" }}</td>
+                        <td>
+                            <div class="d-flex gap-2">
+                            {% if request.user.is_staff %}
+                                <form action="{% url 'lead_update_status' lead.id %}" method="post" class="d-flex gap-2">
+                                    {% csrf_token %}
+                                    <select name="status" class="form-select form-select-sm" onchange="this.form.submit()">
+                                        <option value="NEW" {% if lead.status == 'NEW' %}selected{% endif %}>New</option>
+                                        <option value="IN_PROGRESS" {% if lead.status == 'IN_PROGRESS' %}selected{% endif %}>In Progress</option>
+                                        <option value="CONVERTED" {% if lead.status == 'CONVERTED' %}selected{% endif %}>Converted</option>
+                                        <option value="LOST" {% if lead.status == 'LOST' %}selected{% endif %}>Lost</option>
+                                    </select>
+                                </form>
+                            {% endif %}
+                                <a href="{% url 'lead_update' lead.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                                <form action="{% url 'lead_delete' lead.pk %}" method="post" onsubmit="return confirm('Are you sure you want to delete this lead?');">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="6" class="text-center py-4 text-muted">
+                            No leads found. Click 'Add New Lead' to start.
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}

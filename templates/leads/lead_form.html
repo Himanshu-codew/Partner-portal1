@@ -1,0 +1,51 @@
+{% extends 'base.html' %}
+
+{% block title %}Add New Lead | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-person-plus-fill"></i> Add New Lead</h2>
+    <a href="{% url 'lead_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Leads</a>
+</div>
+
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white py-3">
+                <h5 class="mb-0">Lead Details</h5>
+            </div>
+            <div class="card-body p-4">
+                <form method="post">
+                    {% csrf_token %}
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Customer Full Name <span class="text-danger">*</span></label>
+                        {{ form.customer_name }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Customer Phone Number <span class="text-danger">*</span></label>
+                        {{ form.customer_phone }}
+                    </div>
+                    
+                    <div class="mb-3">
+                        <label class="form-label fw-bold">Product / Service Interest <span class="text-danger">*</span></label>
+                        {{ form.product_interest }}
+                        <div class="form-text">What is the customer looking for? (e.g., Website design, marketing, hardware)</div>
+                    </div>
+                    
+                    <div class="mb-4">
+                        <label class="form-label fw-bold">Additional Notes</label>
+                        {{ form.notes }}
+                        <div class="form-text">Any specific requirements or conversation summary?</div>
+                    </div>
+                    
+                    <div class="d-grid gap-2">
+                        <button type="submit" class="btn btn-success btn-lg">Submit Lead</button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

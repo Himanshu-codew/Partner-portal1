@@ -1,0 +1,81 @@
+{% extends 'base.html' %}
+
+{% block title %}My Profile | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="mb-4">
+    <h2><i class="bi bi-person-badge"></i> My Profile</h2>
+</div>
+
+<div class="row">
+    <div class="col-md-6">
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Partner Details</h5>
+            </div>
+            <div class="card-body">
+                {% if profile %}
+                <table class="table table-borderless">
+                    <tr>
+                        <th class="text-muted" width="40%">Company Name:</th>
+                        <td class="fw-bold">{{ profile.company_name }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Username:</th>
+                        <td>{{ user.username }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Email:</th>
+                        <td>{{ user.email|default:"Not Provided" }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Phone Number:</th>
+                        <td>{{ profile.phone_number }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Address:</th>
+                        <td>{{ profile.address|default:"Not Provided" }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Account Status:</th>
+                        <td>
+                            {% if profile.is_approved %}
+                            <span class="badge bg-success">Approved</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark">Pending Approval</span>
+                            {% endif %}
+                        </td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Member Since:</th>
+                        <td>{{ profile.created_at|date:"F Y" }}</td>
+                    </tr>
+                </table>
+                {% elif user.is_staff %}
+                <div class="alert alert-info mb-4">
+                    You are logged in as a System Administrator.
+                </div>
+                <table class="table table-borderless">
+                    <tr>
+                        <th class="text-muted" width="40%">Role:</th>
+                        <td class="fw-bold text-primary">Master Admin</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Username:</th>
+                        <td>{{ user.username }}</td>
+                    </tr>
+                    <tr>
+                        <th class="text-muted">Email:</th>
+                        <td>{{ user.email|default:"Not Provided" }}</td>
+                    </tr>
+                </table>
+                {% else %}
+                <div class="alert alert-warning mb-0">
+                    Your partner profile is not completely set up yet. Please contact the administrator.
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

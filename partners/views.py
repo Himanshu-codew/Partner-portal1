@@ -1,0 +1,171 @@
+from django.shortcuts import render, redirect
+from django.contrib.auth.decorators import login_required
+from django.contrib import messages
+from .models import PartnerProfile
+
+@login_required(login_url='/login/')
+def partner_list(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    partners = PartnerProfile.objects.all().order_by('-created_at')
+    return render(request, 'partners/partner_list.html', {'partners': partners})
+
+@login_required(login_url='/login/')
+def partner_approve(request, profile_id):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        try:
+            profile = PartnerProfile.objects.get(id=profile_id)
+            is_approved = request.POST.get('is_approved') == 'true'
+            profile.is_approved = is_approved
+            profile.save()
+            status_text = "Approved" if is_approved else "Rejected"
+            messages.success(request, f'Partner {profile.company_name} status updated to {status_text}.')
+        except PartnerProfile.DoesNotExist:
+            messages.error(request, 'Partner not found.')
+            
+    return redirect('partner_list')
+
+from django.contrib.auth.models import User, Group
+from .forms import UserForm, GroupForm, PartnerProfileForm
+
+@login_required(login_url='/login/')
+def partner_create(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        form = PartnerProfileForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Partner Profile successfully created!')
+            return redirect('partner_list')
+    else:
+        form = PartnerProfileForm()
+    return render(request, 'partners/partner_form.html', {'form': form})
+
+
+@login_required(login_url='/login/')
+def user_list(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    users = User.objects.all().order_by('-date_joined')
+    return render(request, 'partners/user_list.html', {'users': users})
+
+@login_required(login_url='/login/')
+def user_create(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        form = UserForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'User successfully created!')
+            return redirect('user_list')
+    else:
+        form = UserForm()
+    return render(request, 'partners/user_form.html', {'form': form})
+
+
+@login_required(login_url='/login/')
+def group_list(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    groups = Group.objects.all()
+    return render(request, 'partners/group_list.html', {'groups': groups})
+
+@login_required(login_url='/login/')
+def group_create(request):
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+        
+    if request.method == 'POST':
+        form = GroupForm(request.POST)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Group successfully created!')
+            return redirect('group_list')
+    else:
+        form = GroupForm()
+    return render(request, 'partners/group_form.html', {'form': form})
+
+from django.shortcuts import get_object_or_404
+
+@login_required(login_url='/login/')
+def partner_update(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    partner = get_object_or_404(PartnerProfile, pk=pk)
+    if request.method == 'POST':
+        form = PartnerProfileForm(request.POST, instance=partner)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Partner updated!')
+            return redirect('partner_list')
+    else:
+        form = PartnerProfileForm(instance=partner)
+    return render(request, 'partners/partner_form.html', {'form': form, 'is_update': True})
+
+@login_required(login_url='/login/')
+def partner_delete(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    partner = get_object_or_404(PartnerProfile, pk=pk)
+    partner.delete()
+    messages.success(request, 'Partner deleted!')
+    return redirect('partner_list')
+
+@login_required(login_url='/login/')
+def user_update(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    u = get_object_or_404(User, pk=pk)
+    if request.method == 'POST':
+        form = UserForm(request.POST, instance=u)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'User updated!')
+            return redirect('user_list')
+    else:
+        form = UserForm(instance=u)
+    return render(request, 'partners/user_form.html', {'form': form, 'is_update': True})
+
+@login_required(login_url='/login/')
+def user_delete(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    u = get_object_or_404(User, pk=pk)
+    u.delete()
+    messages.success(request, 'User deleted!')
+    return redirect('user_list')
+
+@login_required(login_url='/login/')
+def group_update(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    g = get_object_or_404(Group, pk=pk)
+    if request.method == 'POST':
+        form = GroupForm(request.POST, instance=g)
+        if form.is_valid():
+            form.save()
+            messages.success(request, 'Group updated!')
+            return redirect('group_list')
+    else:
+        form = GroupForm(instance=g)
+    return render(request, 'partners/group_form.html', {'form': form, 'is_update': True})
+
+@login_required(login_url='/login/')
+def group_delete(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    g = get_object_or_404(Group, pk=pk)
+    g.delete()
+    messages.success(request, 'Group deleted!')
+    return redirect('group_list')

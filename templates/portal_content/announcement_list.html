@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+{% block title %}Announcements | Partner Portal{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-megaphone"></i> Announcements</h2>
+    {% if request.user.is_staff %}
+    <a href="{% url 'announcement_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add Announcement</a>
+    {% endif %}
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-hover mb-0 align-middle">
+                <thead class="table-light">
+                    <tr>
+                        <th>Title & Content</th>
+                        <th>Status</th>
+                        <th>Created At</th>
+                        {% if request.user.is_staff %}
+                        <th>Actions</th>
+                        {% endif %}
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for item in announcements %}
+                    <tr>
+                        <td>
+                            <strong class="text-primary">{{ item.title }}</strong><br>
+                            <small class="text-muted">{{ item.content|truncatewords:20 }}</small>
+                        </td>
+                        <td>
+                            {% if item.is_active %}
+                            <span class="badge bg-success">Active</span>
+                            {% else %}
+                            <span class="badge bg-secondary">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ item.created_at|date:"M d, Y" }}</td>
+                        {% if request.user.is_staff %}
+                        <td>
+                            <a href="{% url 'announcement_update' item.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
+                            <form action="{% url 'announcement_delete' item.pk %}" method="post" class="d-inline" onsubmit="return confirm('Are you sure?');">
+                                {% csrf_token %}
+                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
+                            </form>
+                        </td>
+                        {% endif %}
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="4" class="text-center py-4 text-muted">No announcements available.</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endblock %}
