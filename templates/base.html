@@ -59,71 +59,111 @@
                     <i class="bi bi-speedometer2"></i> Dashboard
                 </a>
                 {% if request.user.is_staff %}
+                {% if perms.auth.view_group or perms.auth.view_user %}
                 <!-- ADMIN MENU REPLICA -->
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Authentication and Authorization</div>
                 
+                {% if perms.auth.view_group %}
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'group_list' %}" class="flex-grow-1 {% if request.path == '/partners/groups/' %}active{% endif %}">
                         <i class="bi bi-shield-lock"></i> Groups
                     </a>
+                    {% if perms.auth.add_group %}
                     <a href="{% url 'group_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
                 
+                {% if perms.auth.view_user %}
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'user_list' %}" class="flex-grow-1 {% if request.path == '/partners/users/' %}active{% endif %}">
                         <i class="bi bi-person-fill"></i> Users
                     </a>
+                    {% if perms.auth.add_user %}
                     <a href="{% url 'user_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
+                {% endif %}
 
+                {% if perms.leads.view_lead %}
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Leads</div>
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'lead_list' %}" class="flex-grow-1 {% if request.path == '/leads/' %}active{% endif %}">
                         <i class="bi bi-person-lines-fill"></i> Leads
                     </a>
+                    {% if perms.leads.add_lead %}
                     <a href="{% url 'lead_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
                 
+                {% if perms.orders.view_order or perms.orders.view_commission %}
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Orders</div>
+                {% if perms.orders.view_order %}
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'order_list' %}" class="flex-grow-1 {% if request.path == '/orders/' %}active{% endif %}">
                         <i class="bi bi-cart-check"></i> Orders
                     </a>
+                    {% if perms.orders.add_order %}
                     <a href="{% url 'order_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
+                {% if perms.orders.view_commission %}
                 <a href="{% url 'commission_list' %}" class="{% if request.path == '/orders/commission/' %}active{% endif %}">
                     <i class="bi bi-wallet2"></i> Commissions
                 </a>
+                {% endif %}
+                {% endif %}
 
+                {% if perms.partners.view_partnerprofile %}
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Partners</div>
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'partner_list' %}" class="flex-grow-1 {% if request.path == '/partners/' %}active{% endif %}">
                         <i class="bi bi-people-fill"></i> Partner profiles
                     </a>
+                    {% if perms.partners.add_partnerprofile %}
                     <a href="{% url 'partner_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
 
+                {% if perms.portal_content.view_announcement or perms.portal_content.view_document %}
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Portal Content</div>
+                {% if perms.portal_content.view_announcement %}
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'announcement_list' %}" class="flex-grow-1 {% if request.path == '/resources/announcements/' %}active{% endif %}">
                         <i class="bi bi-megaphone"></i> Announcements
                     </a>
+                    {% if perms.portal_content.add_announcement %}
                     <a href="{% url 'announcement_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
+                {% if perms.portal_content.view_document %}
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'document_list' %}" class="flex-grow-1 {% if request.path == '/resources/documents/' %}active{% endif %}">
                         <i class="bi bi-folder2-open"></i> Documents
                     </a>
+                    {% if perms.portal_content.add_document %}
                     <a href="{% url 'document_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
+                {% endif %}
 
+                {% if perms.support.view_ticket %}
                 <div class="mt-4 mb-2 text-uppercase text-secondary fw-bold" style="font-size: 0.75rem; letter-spacing: 1px;">Support</div>
                 <div class="d-flex justify-content-between align-items-center">
                     <a href="{% url 'ticket_list' %}" class="flex-grow-1 {% if request.path == '/support/' %}active{% endif %}">
                         <i class="bi bi-headset"></i> Tickets
                     </a>
+                    {% if perms.support.add_ticket %}
                     <a href="{% url 'ticket_create' %}" class="add-action text-success text-decoration-none" title="Add"><i class="bi bi-plus-circle-fill"></i> Add</a>
+                    {% endif %}
                 </div>
+                {% endif %}
                 <br>
 
                 {% elif request.user.partner_profile and request.user.partner_profile.is_approved %}
