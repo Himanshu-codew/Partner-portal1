@@ -12,6 +12,31 @@ class LeadForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'class': 'form-control', 'rows': 4, 'placeholder': 'Any additional details...'}),
         }
 
+    def clean_customer_phone(self):
+        phone = self.cleaned_data.get('customer_phone')
+        import re
+        # Remove spaces, dashes, and plus signs to count actual digits
+        cleaned_number = re.sub(r'[\s\-\+]', '', phone)
+        if not cleaned_number.isdigit():
+            raise forms.ValidationError("Phone number can only contain digits, spaces, -, or +.")
+        if len(cleaned_number) < 10 or len(cleaned_number) > 15:
+            raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        return phone
+
+    def clean_customer_name(self):
+        name = self.cleaned_data.get('customer_name')
+        import re
+        if not re.search(r'[a-zA-Z]', name):
+            raise forms.ValidationError("Name must contain alphabets (cannot be just numbers or symbols).")
+        return name
+
+    def clean_product_interest(self):
+        interest = self.cleaned_data.get('product_interest')
+        import re
+        if interest and not re.search(r'[a-zA-Z]', interest):
+            raise forms.ValidationError("Product interest must contain alphabets (cannot be just numbers).")
+        return interest
+
 class AdminLeadForm(LeadForm):
     class Meta(LeadForm.Meta):
         fields = ['partner', 'customer_name', 'customer_phone', 'product_interest', 'notes']
