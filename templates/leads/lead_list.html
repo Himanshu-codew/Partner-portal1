@@ -28,7 +28,7 @@
                     {% for lead in leads %}
                     <tr>
                         <td class="fw-bold">
-                            {{ lead.customer_name }}
+                            <a href="{% url 'lead_update' lead.pk %}" class="text-decoration-none">{{ lead.customer_name }}</a>
                             {% if request.user.is_staff and lead.partner %}
                             <br><small class="text-muted fw-normal"><i class="bi bi-person"></i> Partner: {{ lead.partner.user.username }}</small>
                             {% endif %}

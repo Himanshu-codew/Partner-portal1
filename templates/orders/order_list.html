@@ -29,7 +29,13 @@
                         {% for order in orders %}
                         <tr>
                             <td class="fw-bold">
+                                {% if request.user.is_staff %}
+                                <a href="{% url 'order_update' order.pk %}" class="text-decoration-none">
+                                    <span class="text-primary">#{{ order.order_number }}</span>
+                                </a>
+                                {% else %}
                                 <span class="text-primary">#{{ order.order_number }}</span>
+                                {% endif %}
                                 {% if request.user.is_staff and order.partner %}
                                 <br><small class="text-primary fw-normal"><i class="bi bi-person"></i> Partner: {{ order.partner.user.username }}</small>
                                 {% endif %}

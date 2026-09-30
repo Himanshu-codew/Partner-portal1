@@ -20,7 +20,9 @@
                 <tbody>
                     {% for group in groups %}
                     <tr>
-                        <td class="fw-bold">{{ group.name }}</td>
+                        <td class="fw-bold">
+                            <a href="{% url 'group_update' group.pk %}" class="text-decoration-none">{{ group.name }}</a>
+                        </td>
                         <td>{{ group.permissions.count }} permissions</td>
                         <td>
                             <a href="{% url 'group_update' group.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>

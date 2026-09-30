@@ -25,7 +25,9 @@
                 <tbody>
                     {% for partner in partners %}
                     <tr>
-                        <td class="fw-bold">{{ partner.company_name }}</td>
+                        <td class="fw-bold">
+                            <a href="{% url 'partner_update' partner.pk %}" class="text-decoration-none">{{ partner.company_name }}</a>
+                        </td>
                         <td>{{ partner.user.username }}</td>
                         <td>{{ partner.user.email }}</td>
                         <td>{{ partner.phone_number }}</td>

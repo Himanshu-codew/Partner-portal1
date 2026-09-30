@@ -29,7 +29,11 @@
                     {% for ticket in tickets %}
                     <tr>
                         <td class="fw-bold">
+                            {% if request.user.is_staff %}
+                            <a href="{% url 'ticket_update' ticket.pk %}" class="text-decoration-none">{{ ticket.subject }}</a><br>
+                            {% else %}
                             {{ ticket.subject }}<br>
+                            {% endif %}
                             <small class="text-muted fw-normal">{{ ticket.description|truncatewords:10 }}</small>
                             {% if request.user.is_staff and ticket.partner %}
                             <br><small class="text-primary fw-normal"><i class="bi bi-person"></i> Partner: {{ ticket.partner.user.username }}</small>

@@ -24,7 +24,9 @@
                 <tbody>
                     {% for u in users %}
                     <tr>
-                        <td class="fw-bold">{{ u.username }}</td>
+                        <td class="fw-bold">
+                            <a href="{% url 'user_update' u.pk %}" class="text-decoration-none">{{ u.username }}</a>
+                        </td>
                         <td>{{ u.email }}</td>
                         <td>{% if u.is_staff %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}</td>
                         <td>{% if u.is_superuser %}<i class="bi bi-check-circle-fill text-success"></i>{% else %}<i class="bi bi-x-circle-fill text-danger"></i>{% endif %}</td>
