@@ -73,10 +73,16 @@
             <div class="card-body">
                 <form method="POST">
                     {% csrf_token %}
-                    <!-- Status -->
                     <div class="mb-4">
                         <label class="form-label fw-semibold">Update Status</label>
                         {{ form.status }}
+                    </div>
+                    
+                    <!-- Hidden fields to pass validation -->
+                    <div class="d-none">
+                        {{ form.partner }}
+                        {{ form.subject }}
+                        {{ form.description }}
                     </div>
 
                     <!-- Admin Reply -->
