@@ -62,7 +62,14 @@
                     {% for ticket in tickets %}
                     <tr>
                         <td class="ps-4">
-                            <div class="fw-bold text-dark"><a href="{% url 'ticket_update' ticket.pk %}" class="text-decoration-none text-dark">{{ ticket.subject }}</a></div>
+                            <div class="fw-bold text-dark">
+                                <a href="{% url 'ticket_update' ticket.pk %}" class="text-decoration-none text-dark">{{ ticket.subject }}</a>
+                                {% if ticket.admin_reply %}
+                                <span class="badge bg-success ms-1" style="font-size:0.65rem;">
+                                    <i class="bi bi-reply-fill me-1"></i>Replied
+                                </span>
+                                {% endif %}
+                            </div>
                             <small class="text-muted text-truncate d-inline-block" style="max-width: 250px;">{{ ticket.description }}</small>
                         </td>
                         <td>
