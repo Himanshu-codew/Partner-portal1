@@ -41,3 +41,39 @@ class PartnerRegistrationForm(forms.ModelForm):
         if password != confirm_password:
             raise forms.ValidationError("Passwords do not match!")
         return cleaned_data
+
+class PartnerProfileUpdateForm(forms.ModelForm):
+    class Meta:
+        model = PartnerProfile
+        fields = ['company_name', 'phone_number', 'address']
+        widgets = {
+            'company_name': forms.TextInput(attrs={'class': 'form-control'}),
+            'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
+            'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+        }
+
+    def clean_phone_number(self):
+        phone = self.cleaned_data.get('phone_number')
+        import re
+        cleaned_number = re.sub(r'[\s\-\+]', '', phone)
+        if not cleaned_number.isdigit():
+            raise forms.ValidationError("Phone number can only contain digits, spaces, -, or +.")
+        if len(cleaned_number) < 10 or len(cleaned_number) > 15:
+            raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        return phone
+
+    def clean_company_name(self):
+        name = self.cleaned_data.get('company_name')
+        import re
+        if not re.search(r'[a-zA-Z]', name):
+            raise forms.ValidationError("Company name must contain alphabets.")
+        return name
+
+class UserUpdateForm(forms.ModelForm):
+    class Meta:
+        model = User
+        fields = ['email']
+        widgets = {
+            'email': forms.EmailInput(attrs={'class': 'form-control'}),
+        }
+

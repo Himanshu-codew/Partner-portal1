@@ -138,3 +138,34 @@ def register_view(request):
         form = PartnerRegistrationForm()
         
     return render(request, 'register.html', {'form': form})
+
+
+@login_required(login_url='/login/')
+def profile_edit(request):
+    try:
+        profile = request.user.partner_profile
+    except (PartnerProfile.DoesNotExist, ObjectDoesNotExist):
+        from django.contrib import messages
+        messages.error(request, 'You do not have a partner profile to edit.')
+        return redirect('dashboard')
+        
+    from .forms import PartnerProfileUpdateForm, UserUpdateForm
+    from django.contrib import messages
+    
+    if request.method == 'POST':
+        u_form = UserUpdateForm(request.POST, instance=request.user)
+        p_form = PartnerProfileUpdateForm(request.POST, instance=profile)
+        if u_form.is_valid() and p_form.is_valid():
+            u_form.save()
+            p_form.save()
+            messages.success(request, 'Your profile has been updated successfully!')
+            return redirect('profile')
+    else:
+        u_form = UserUpdateForm(instance=request.user)
+        p_form = PartnerProfileUpdateForm(instance=profile)
+        
+    context = {
+        'u_form': u_form,
+        'p_form': p_form,
+    }
+    return render(request, 'profile_edit.html', context)

@@ -25,8 +25,8 @@
         <p class="text-muted mb-0">Manage and track your prospective clients.</p>
     </div>
     <div class="mt-2 mt-md-0">
-        {% if perms.leads.add_lead %}
-        <a href="{% url 'lead_create' %}" class="btn btn-primary shadow-sm"><i class="bi bi-plus-circle me-1"></i> Add Lead</a>
+        {% if request.user.is_staff and perms.leads.add_lead or not request.user.is_staff %}
+        <a href="{% url 'lead_create' %}" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-1"></i> Add New Lead</a>
         {% endif %}
     </div>
 </div>
@@ -71,7 +71,7 @@
                     {% for lead in leads %}
                     <tr>
                         <td class="ps-4">
-                            <div class="fw-bold text-dark">{{ lead.customer_name }}</div>
+                            <div class="fw-bold text-dark"><a href="{% url 'lead_update' lead.pk %}" class="text-decoration-none text-dark">{{ lead.customer_name }}</a></div>
                             {% if request.user.is_staff and lead.partner %}
                             <small class="text-muted"><i class="bi bi-building me-1"></i>{{ lead.partner.company_name }}</small>
                             {% endif %}
@@ -108,8 +108,8 @@
                                 </div>
                                 <h5 class="fw-bold text-dark">No Leads Found</h5>
                                 <p class="text-muted mb-4">You haven't added any leads yet, or none match your search.</p>
-                                {% if perms.leads.add_lead %}
-                                <a href="{% url 'lead_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle me-1"></i> Add Your First Lead</a>
+                                {% if request.user.is_staff and perms.leads.add_lead or not request.user.is_staff %}
+                                <a href="{% url 'lead_create' %}" class="btn btn-primary"><i class="bi bi-plus-lg me-1"></i> Add your first lead</a>
                                 {% endif %}
                             </div>
                         </td>

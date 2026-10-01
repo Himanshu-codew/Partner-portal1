@@ -16,8 +16,8 @@
         <p class="text-muted mb-0">Get help and track your support queries.</p>
     </div>
     <div class="mt-2 mt-md-0">
-        {% if perms.support.add_ticket %}
-        <a href="{% url 'ticket_create' %}" class="btn btn-warning shadow-sm"><i class="bi bi-plus-circle me-1"></i> New Ticket</a>
+        {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff %}
+        <a href="{% url 'ticket_create' %}" class="btn btn-warning shadow-sm"><i class="bi bi-plus-lg me-1"></i> Raise a Ticket</a>
         {% endif %}
     </div>
 </div>
@@ -62,7 +62,7 @@
                     {% for ticket in tickets %}
                     <tr>
                         <td class="ps-4">
-                            <div class="fw-bold text-dark">{{ ticket.subject }}</div>
+                            <div class="fw-bold text-dark"><a href="{% url 'ticket_update' ticket.pk %}" class="text-decoration-none text-dark">{{ ticket.subject }}</a></div>
                             <small class="text-muted text-truncate d-inline-block" style="max-width: 250px;">{{ ticket.description }}</small>
                         </td>
                         <td>
@@ -99,8 +99,8 @@
                                 </div>
                                 <h5 class="fw-bold text-dark">No Tickets Found</h5>
                                 <p class="text-muted mb-4">No support tickets match your search, or none have been created yet.</p>
-                                {% if perms.support.add_ticket %}
-                                <a href="{% url 'ticket_create' %}" class="btn btn-warning"><i class="bi bi-plus-circle me-1"></i> Create Ticket</a>
+                                {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff %}
+                                <a href="{% url 'ticket_create' %}" class="btn btn-warning"><i class="bi bi-plus-lg me-1"></i> Raise a Ticket</a>
                                 {% endif %}
                             </div>
                         </td>

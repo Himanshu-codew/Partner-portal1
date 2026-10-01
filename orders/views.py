@@ -61,13 +61,22 @@ def commission_list(request):
             messages.error(request, 'Error: You must have a Partner Profile to view commissions.')
             return redirect('dashboard')
 
+    from django.db.models import Sum
+
+    total_earned = orders_qs.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
+    pending_commission = orders_qs.filter(is_commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or 0
+    total_orders = orders_qs.count()
+
     paginator = Paginator(orders_qs, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
             
     return render(request, 'orders/commission_list.html', {
         'orders': page_obj,
-        'page_obj': page_obj
+        'page_obj': page_obj,
+        'total_earned': total_earned,
+        'pending_commission': pending_commission,
+        'total_orders': total_orders,
     })
 
 @login_required(login_url='/login/')
@@ -110,13 +119,8 @@ def order_update_status(request, order_id):
 def order_update(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if order.partner != profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+        messages.error(request, 'Unauthorized access.')
+        return redirect('order_list')
         
     if request.method == 'POST':
         form = OrderForm(request.POST, instance=order)
@@ -133,13 +137,8 @@ def order_update(request, pk):
 def order_delete(request, pk):
     order = get_object_or_404(Order, pk=pk)
     if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if order.partner != profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+        messages.error(request, 'Unauthorized access.')
+        return redirect('order_list')
             
     order.soft_delete(request.user)
     messages.success(request, 'Moved to Recycle Bin')

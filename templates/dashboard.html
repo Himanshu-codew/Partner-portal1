@@ -60,13 +60,13 @@
 
 <!-- Quick Actions -->
 <div class="mb-4 d-flex gap-2 flex-wrap">
-    {% if perms.leads.add_lead %}
+    {% if request.user.is_staff and perms.leads.add_lead or not request.user.is_staff and request.user.partner_profile.is_approved %}
     <a href="{% url 'lead_create' %}" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-1"></i> Add Lead</a>
     {% endif %}
     {% if request.user.is_staff and perms.orders.add_order %}
     <a href="{% url 'order_create' %}" class="btn btn-success shadow-sm"><i class="bi bi-cart-plus me-1"></i> Add Order</a>
     {% endif %}
-    {% if perms.support.add_ticket %}
+    {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff and request.user.partner_profile.is_approved %}
     <a href="{% url 'ticket_create' %}" class="btn btn-outline-secondary bg-white shadow-sm"><i class="bi bi-headset me-1"></i> Raise Ticket</a>
     {% endif %}
 </div>

@@ -94,9 +94,11 @@
                                             {% endfor %}
                                         </select>
                                     </form>
+                                    <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'order_delete' order.pk %}" data-message="Are you sure you want to delete order '#{{ order.order_number }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                {% else %}
+                                    <span class="text-muted small">View Only</span>
                                 {% endif %}
-                                <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'order_delete' order.pk %}" data-message="Are you sure you want to delete order '#{{ order.order_number }}'?" title="Delete"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -108,7 +110,7 @@
                                     <i class="bi bi-cart-x text-muted fs-1"></i>
                                 </div>
                                 <h5 class="fw-bold text-dark">No Orders Found</h5>
-                                <p class="text-muted mb-4">There are no orders to display yet.</p>
+                                <p class="text-muted mb-4">Orders appear here when your leads convert.</p>
                             </div>
                         </td>
                     </tr>
