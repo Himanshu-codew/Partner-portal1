@@ -79,6 +79,13 @@ def commission_list(request):
         net_profit=ExpressionWrapper(F('amount') - F('commission_amount'), output_field=DecimalField())
     )
 
+    # Card filter: ?filter=paid / pending / all
+    commission_filter = request.GET.get('filter', 'all')
+    if commission_filter == 'paid':
+        orders_qs = orders_qs.filter(is_commission_paid=True)
+    elif commission_filter == 'pending':
+        orders_qs = orders_qs.filter(is_commission_paid=False)
+
     paginator = Paginator(orders_qs, 10)
     page_number = request.GET.get('page')
     page_obj = paginator.get_page(page_number)
@@ -92,6 +99,7 @@ def commission_list(request):
         'admin_net_revenue': admin_net_revenue,
         'admin_total_revenue': admin_total_revenue,
         'is_staff': request.user.is_staff,
+        'commission_filter': commission_filter,
     })
 
 @login_required(login_url='/login/')
