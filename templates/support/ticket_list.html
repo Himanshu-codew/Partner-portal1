@@ -33,7 +33,7 @@
             </div>
             <div class="col-md-4">
                 <select name="status" class="form-select">
-                    <option value="">All Statuses</option>
+                    <option value="">All Status</option>
                     {% for key, val in statuses.items %}
                     <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ val }}</option>
                     {% endfor %}
