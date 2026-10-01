@@ -3,8 +3,16 @@
 {% block title %}Resources | Partner Portal{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <h2><i class="bi bi-file-earmark-text"></i> Resources & Announcements</h2>
+<div class="mb-4 d-flex justify-content-between align-items-center flex-wrap gap-2">
+    <div>
+        <h2><i class="bi bi-file-earmark-text"></i> Resources & Announcements</h2>
+        {% if request.user.is_staff %}
+        <p class="text-muted small mb-0">
+            <i class="bi bi-info-circle me-1"></i>
+            <strong>Public</strong> = shown to all partners. <strong>Private</strong> = only selected partners see it.
+        </p>
+        {% endif %}
+    </div>
 </div>
 
 <div class="row">
@@ -21,8 +29,24 @@
                 {% for announcement in announcements %}
                 <div class="card shadow-sm border-0 mb-3">
                     <div class="card-body">
-                        <h5 class="fw-bold">{{ announcement.title }}</h5>
+                        <div class="d-flex justify-content-between align-items-start mb-1">
+                            <h5 class="fw-bold mb-0">{{ announcement.title }}</h5>
+                            {% if request.user.is_staff %}
+                                {% if announcement.visible_to.exists %}
+                                <span class="badge bg-warning text-dark ms-2"><i class="bi bi-lock-fill me-1"></i>Private</span>
+                                {% else %}
+                                <span class="badge bg-success ms-2"><i class="bi bi-globe me-1"></i>Public</span>
+                                {% endif %}
+                            {% endif %}
+                        </div>
                         <small class="text-muted d-block mb-3"><i class="bi bi-calendar3"></i> {{ announcement.created_at|date:"M d, Y" }}</small>
+                        {% if request.user.is_staff and announcement.visible_to.exists %}
+                        <small class="text-muted d-block mb-2">
+                            <i class="bi bi-people-fill me-1"></i>
+                            <strong>Visible to:</strong>
+                            {% for p in announcement.visible_to.all %}{{ p.company_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                        </small>
+                        {% endif %}
                         <p class="mb-0 text-dark">{{ announcement.content|linebreaksbr }}</p>
                     </div>
                 </div>
@@ -48,12 +72,27 @@
             <div class="card-body p-0">
                 <ul class="list-group list-group-flush">
                     {% for doc in documents %}
-                    <li class="list-group-item d-flex justify-content-between align-items-center p-3">
+                    <li class="list-group-item d-flex justify-content-between align-items-start p-3 flex-column flex-sm-row gap-2">
                         <div>
-                            <div class="fw-bold">{{ doc.title }}</div>
+                            <div class="d-flex align-items-center gap-2 flex-wrap">
+                                <span class="fw-bold">{{ doc.title }}</span>
+                                {% if request.user.is_staff %}
+                                    {% if doc.visible_to.exists %}
+                                    <span class="badge bg-warning text-dark"><i class="bi bi-lock-fill me-1"></i>Private</span>
+                                    {% else %}
+                                    <span class="badge bg-success"><i class="bi bi-globe me-1"></i>Public</span>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
                             <small class="text-muted">Added: {{ doc.uploaded_at|date:"M d, Y" }}</small>
+                            {% if request.user.is_staff and doc.visible_to.exists %}
+                            <br><small class="text-muted">
+                                <i class="bi bi-people-fill me-1"></i>
+                                {% for p in doc.visible_to.all %}{{ p.company_name }}{% if not forloop.last %}, {% endif %}{% endfor %}
+                            </small>
+                            {% endif %}
                         </div>
-                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-success"><i class="bi bi-download"></i> Download</a>
+                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-success align-self-center"><i class="bi bi-download"></i> Download</a>
                     </li>
                     {% empty %}
                     <li class="list-group-item text-center py-5 text-muted border-bottom-0">
@@ -67,3 +106,4 @@
     </div>
 </div>
 {% endblock %}
+
