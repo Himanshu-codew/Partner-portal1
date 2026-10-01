@@ -61,11 +61,23 @@ def commission_list(request):
             messages.error(request, 'Error: You must have a Partner Profile to view commissions.')
             return redirect('dashboard')
 
-    from django.db.models import Sum
+    from django.db.models import Sum, F, ExpressionWrapper, DecimalField
 
     total_earned = orders_qs.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
     pending_commission = orders_qs.filter(is_commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or 0
     total_orders = orders_qs.count()
+
+    # Admin-specific: Net Revenue = Total Amount collected - Total Commission paid out
+    total_amount_collected = orders_qs.aggregate(total=Sum('amount'))['total'] or 0
+    total_commission_all = orders_qs.aggregate(total=Sum('commission_amount'))['total'] or 0
+    admin_net_revenue = total_amount_collected - total_commission_all
+    admin_total_revenue = total_amount_collected
+
+    # Annotate each order with net_profit for admin table
+    from django.db.models import ExpressionWrapper, DecimalField, F
+    orders_qs = orders_qs.annotate(
+        net_profit=ExpressionWrapper(F('amount') - F('commission_amount'), output_field=DecimalField())
+    )
 
     paginator = Paginator(orders_qs, 10)
     page_number = request.GET.get('page')
@@ -77,6 +89,9 @@ def commission_list(request):
         'total_earned': total_earned,
         'pending_commission': pending_commission,
         'total_orders': total_orders,
+        'admin_net_revenue': admin_net_revenue,
+        'admin_total_revenue': admin_total_revenue,
+        'is_staff': request.user.is_staff,
     })
 
 @login_required(login_url='/login/')

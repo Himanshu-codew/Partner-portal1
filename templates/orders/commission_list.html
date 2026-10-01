@@ -1,12 +1,85 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
-{% block title %}My Commissions | Partner Portal{% endblock %}
+{% block title %}{% if is_staff %}Revenue Overview{% else %}My Commissions{% endif %} | Partner Portal{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-wallet2 text-success me-2"></i> Commissions</h2>
+    <div>
+        <h2><i class="bi bi-wallet2 text-success me-2"></i> {% if is_staff %}Revenue Overview{% else %}Commissions{% endif %}</h2>
+        <p class="text-muted small mb-0">
+            {% if is_staff %}
+                Track total revenue collected, commissions paid out, and your net profit.
+            {% else %}
+                Track your commission earnings from converted leads.
+            {% endif %}
+        </p>
+    </div>
 </div>
 
+{% if is_staff %}
+<!-- ═══ ADMIN CARDS ═══ -->
+<div class="row g-4 mb-4">
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #1a73e8, #0d47a1); color:white;">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                    <i class="bi bi-currency-rupee fs-3"></i>
+                </div>
+                <div>
+                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Total Collected</h6>
+                    <h3 class="mb-0 fw-bold">₹ {{ admin_total_revenue|floatformat:2|intcomma }}</h3>
+                    <small class="text-white-50">From all clients</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100 bg-success text-white">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                    <i class="bi bi-graph-up-arrow fs-3"></i>
+                </div>
+                <div>
+                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Your Net Profit</h6>
+                    <h3 class="mb-0 fw-bold">₹ {{ admin_net_revenue|floatformat:2|intcomma }}</h3>
+                    <small class="text-white-50">After partner commissions</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100 bg-warning text-dark">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
+                    <i class="bi bi-hourglass-split fs-3"></i>
+                </div>
+                <div>
+                    <h6 class="mb-1 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.75rem;">Pending Commission</h6>
+                    <h3 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h3>
+                    <small class="opacity-75">Owed to partners</small>
+                </div>
+            </div>
+        </div>
+    </div>
+    <div class="col-md-3">
+        <div class="card shadow-sm border-0 h-100 bg-primary text-white">
+            <div class="card-body p-4 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
+                    <i class="bi bi-cart-check fs-3"></i>
+                </div>
+                <div>
+                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Total Orders</h6>
+                    <h3 class="mb-0 fw-bold">{{ total_orders }}</h3>
+                    <small class="text-white-50">All time</small>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{% else %}
+<!-- ═══ PARTNER CARDS ═══ -->
 <div class="row g-4 mb-4">
     <div class="col-md-4">
         <div class="card shadow-sm border-0 bg-success text-white h-100">
@@ -16,7 +89,7 @@
                 </div>
                 <div>
                     <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.8rem;">Total Earned (Paid)</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ total_earned|default:"0.00" }}</h3>
+                    <h3 class="mb-0 fw-bold">₹ {{ total_earned|floatformat:2|intcomma }}</h3>
                 </div>
             </div>
         </div>
@@ -29,7 +102,7 @@
                 </div>
                 <div>
                     <h6 class="mb-1 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.8rem;">Pending Commission</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ pending_commission|default:"0.00" }}</h3>
+                    <h3 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h3>
                 </div>
             </div>
         </div>
@@ -42,13 +115,15 @@
                 </div>
                 <div>
                     <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.8rem;">Total Orders</h6>
-                    <h3 class="mb-0 fw-bold">{{ total_orders|default:"0" }}</h3>
+                    <h3 class="mb-0 fw-bold">{{ total_orders }}</h3>
                 </div>
             </div>
         </div>
     </div>
 </div>
+{% endif %}
 
+<!-- ═══ TABLE ═══ -->
 <div class="card shadow-sm border-0">
     <div class="card-body">
         <div class="table-responsive">
@@ -56,8 +131,10 @@
                 <thead class="table-light">
                     <tr>
                         <th>Order Number</th>
-                        <th>Order Amount</th>
-                        <th>Commission</th>
+                        {% if is_staff %}<th>Partner</th>{% endif %}
+                        <th>Client Amount</th>
+                        <th>{% if is_staff %}Partner Commission{% else %}Your Commission{% endif %}</th>
+                        {% if is_staff %}<th>Your Profit</th>{% endif %}
                         <th>Commission Status</th>
                         <th>Date</th>
                     </tr>
@@ -66,8 +143,16 @@
                     {% for order in orders %}
                     <tr>
                         <td class="fw-bold text-primary">#{{ order.order_number }}</td>
-                        <td>₹ {{ order.amount }}</td>
-                        <td class="text-success fw-bold">₹ {{ order.commission_amount }}</td>
+                        {% if is_staff %}<td>{{ order.partner.company_name }}</td>{% endif %}
+                        <td>₹ {{ order.amount|floatformat:2|intcomma }}</td>
+                        <td class="{% if is_staff %}text-warning{% else %}text-success{% endif %} fw-bold">
+                            ₹ {{ order.commission_amount|floatformat:2|intcomma }}
+                        </td>
+                        {% if is_staff %}
+                        <td class="text-success fw-bold">
+                            ₹ {{ order.net_profit|floatformat:2|intcomma }}
+                        </td>
+                        {% endif %}
                         <td>
                             {% if order.is_commission_paid %}
                                 <span class="badge bg-success">Paid</span>
@@ -79,7 +164,7 @@
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="5" class="text-center py-4 text-muted">
+                        <td colspan="{% if is_staff %}7{% else %}5{% endif %}" class="text-center py-4 text-muted">
                             No commissions generated yet. Once a lead converts, the commission will appear here.
                         </td>
                     </tr>
