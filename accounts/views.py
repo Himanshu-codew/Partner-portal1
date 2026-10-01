@@ -144,25 +144,32 @@ def register_view(request):
 def profile_edit(request):
     try:
         profile = request.user.partner_profile
+        has_profile = True
     except (PartnerProfile.DoesNotExist, ObjectDoesNotExist):
-        from django.contrib import messages
-        messages.error(request, 'You do not have a partner profile to edit.')
-        return redirect('dashboard')
+        profile = None
+        has_profile = False
         
     from .forms import PartnerProfileUpdateForm, UserUpdateForm
     from django.contrib import messages
     
     if request.method == 'POST':
         u_form = UserUpdateForm(request.POST, instance=request.user)
-        p_form = PartnerProfileUpdateForm(request.POST, instance=profile)
-        if u_form.is_valid() and p_form.is_valid():
+        if has_profile:
+            p_form = PartnerProfileUpdateForm(request.POST, instance=profile)
+            p_valid = p_form.is_valid()
+        else:
+            p_form = None
+            p_valid = True
+            
+        if u_form.is_valid() and p_valid:
             u_form.save()
-            p_form.save()
+            if has_profile:
+                p_form.save()
             messages.success(request, 'Your profile has been updated successfully!')
             return redirect('profile')
     else:
         u_form = UserUpdateForm(instance=request.user)
-        p_form = PartnerProfileUpdateForm(instance=profile)
+        p_form = PartnerProfileUpdateForm(instance=profile) if has_profile else None
         
     context = {
         'u_form': u_form,

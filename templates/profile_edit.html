@@ -1,5 +1,5 @@
 {% extends 'base.html' %}
-{% load crispy_forms_tags %}
+
 
 {% block title %}Edit Profile | Partner Portal{% endblock %}
 
@@ -18,8 +18,10 @@
                     <h5 class="mb-3 border-bottom pb-2">Account Details</h5>
                     {{ u_form.as_p }}
                     
+                    {% if p_form %}
                     <h5 class="mb-3 mt-4 border-bottom pb-2">Company Information</h5>
                     {{ p_form.as_p }}
+                    {% endif %}
                     
                     <div class="d-flex justify-content-end gap-2 mt-4">
                         <a href="{% url 'profile' %}" class="btn btn-light">Cancel</a>
