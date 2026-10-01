@@ -19,59 +19,59 @@
 
 {% if is_staff %}
 <!-- ═══ ADMIN CARDS ═══ -->
-<div class="row g-4 mb-4">
+<div class="row g-3 mb-4">
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100" style="background: linear-gradient(135deg, #1a73e8, #0d47a1); color:white;">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
-                    <i class="bi bi-currency-rupee fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 me-3">
+                    <i class="bi bi-currency-rupee fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Total Collected</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ admin_total_revenue|floatformat:2|intcomma }}</h3>
-                    <small class="text-white-50">From all clients</small>
+                    <h6 class="mb-0 text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Collected</h6>
+                    <h5 class="mb-0 fw-bold">₹ {{ admin_total_revenue|floatformat:2|intcomma }}</h5>
+                    <small class="text-white-50" style="font-size:0.7rem;">From all clients</small>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100 bg-success text-white">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
-                    <i class="bi bi-graph-up-arrow fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 me-3">
+                    <i class="bi bi-graph-up-arrow fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Your Net Profit</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ admin_net_revenue|floatformat:2|intcomma }}</h3>
-                    <small class="text-white-50">After partner commissions</small>
+                    <h6 class="mb-0 text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Your Net Profit</h6>
+                    <h5 class="mb-0 fw-bold">₹ {{ admin_net_revenue|floatformat:2|intcomma }}</h5>
+                    <small class="text-white-50" style="font-size:0.7rem;">After partner commissions</small>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100 bg-warning text-dark">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
-                    <i class="bi bi-hourglass-split fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-dark bg-opacity-10 rounded-circle p-2 me-3">
+                    <i class="bi bi-hourglass-split fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.75rem;">Pending Commission</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h3>
-                    <small class="opacity-75">Owed to partners</small>
+                    <h6 class="mb-0 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.7rem;">Pending Commission</h6>
+                    <h5 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h5>
+                    <small class="opacity-75" style="font-size:0.7rem;">Owed to partners</small>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-3">
         <div class="card shadow-sm border-0 h-100 bg-primary text-white">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
-                    <i class="bi bi-cart-check fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 me-3">
+                    <i class="bi bi-cart-check fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.75rem;">Total Orders</h6>
-                    <h3 class="mb-0 fw-bold">{{ total_orders }}</h3>
-                    <small class="text-white-50">All time</small>
+                    <h6 class="mb-0 text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Orders</h6>
+                    <h5 class="mb-0 fw-bold">{{ total_orders }}</h5>
+                    <small class="text-white-50" style="font-size:0.7rem;">All time</small>
                 </div>
             </div>
         </div>
@@ -80,42 +80,42 @@
 
 {% else %}
 <!-- ═══ PARTNER CARDS ═══ -->
-<div class="row g-4 mb-4">
+<div class="row g-3 mb-4">
     <div class="col-md-4">
         <div class="card shadow-sm border-0 bg-success text-white h-100">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
-                    <i class="bi bi-cash-stack fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 me-3">
+                    <i class="bi bi-cash-stack fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.8rem;">Total Earned (Paid)</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ total_earned|floatformat:2|intcomma }}</h3>
+                    <h6 class="mb-0 text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Earned (Paid)</h6>
+                    <h5 class="mb-0 fw-bold">₹ {{ total_earned|floatformat:2|intcomma }}</h5>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card shadow-sm border-0 bg-warning text-dark h-100">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-dark bg-opacity-10 rounded-circle p-3 me-3">
-                    <i class="bi bi-hourglass-split fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-dark bg-opacity-10 rounded-circle p-2 me-3">
+                    <i class="bi bi-hourglass-split fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.8rem;">Pending Commission</h6>
-                    <h3 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h3>
+                    <h6 class="mb-0 text-dark text-uppercase fw-bold opacity-75" style="font-size: 0.7rem;">Pending Commission</h6>
+                    <h5 class="mb-0 fw-bold">₹ {{ pending_commission|floatformat:2|intcomma }}</h5>
                 </div>
             </div>
         </div>
     </div>
     <div class="col-md-4">
         <div class="card shadow-sm border-0 bg-primary text-white h-100">
-            <div class="card-body p-4 d-flex align-items-center">
-                <div class="bg-white bg-opacity-25 rounded-circle p-3 me-3">
-                    <i class="bi bi-cart-check fs-3"></i>
+            <div class="card-body p-3 d-flex align-items-center">
+                <div class="bg-white bg-opacity-25 rounded-circle p-2 me-3">
+                    <i class="bi bi-cart-check fs-5"></i>
                 </div>
                 <div>
-                    <h6 class="mb-1 text-white-50 text-uppercase fw-bold" style="font-size: 0.8rem;">Total Orders</h6>
-                    <h3 class="mb-0 fw-bold">{{ total_orders }}</h3>
+                    <h6 class="mb-0 text-white-50 text-uppercase fw-bold" style="font-size: 0.7rem;">Total Orders</h6>
+                    <h5 class="mb-0 fw-bold">{{ total_orders }}</h5>
                 </div>
             </div>
         </div>
