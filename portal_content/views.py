@@ -81,8 +81,8 @@ def announcement_update(request, pk):
 def announcement_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     obj = get_object_or_404(Announcement, pk=pk)
-    obj.delete()
-    messages.success(request, 'Announcement deleted!')
+    obj.soft_delete(request.user)
+    messages.success(request, 'Moved to Recycle Bin')
     return redirect('announcement_list')
 
 @login_required(login_url='/login/')
@@ -104,6 +104,6 @@ def document_update(request, pk):
 def document_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     obj = get_object_or_404(Document, pk=pk)
-    obj.delete()
-    messages.success(request, 'Document deleted!')
+    obj.soft_delete(request.user)
+    messages.success(request, 'Moved to Recycle Bin')
     return redirect('document_list')

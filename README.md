@@ -63,3 +63,11 @@ You must set the following environment variables in your Render Web Service dash
 
 - **Ephemeral File System**: On Render's free tier, the file system is ephemeral. Any files uploaded to `media/` (like portal Documents) will be lost every time the app restarts or redeploys. For production usage, it is highly recommended to configure an external storage backend like **Amazon S3** or **Cloudinary** using `django-storages`.
 - **Instance Sleeping**: On Render's free tier, the instance will spin down after 15 minutes of inactivity. The first request after a period of inactivity may take 30-60 seconds as the instance spins back up.
+
+### Management Commands
+
+- **Recycle Bin Cleanup**: Deleted items are soft-deleted and moved to the Recycle Bin. To permanently delete items older than N days (default is 30 days), run the following command:
+  ```bash
+  python manage.py purge_recycle_bin --days 30
+  ```
+  On Render, you can schedule this as a Background Cron Job to automatically clean up old data.

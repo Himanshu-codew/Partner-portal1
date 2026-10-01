@@ -1,8 +1,9 @@
+from core.models import SoftDeleteModel
 from django.db import models
 from partners.models import PartnerProfile
 from leads.models import Lead
 
-class Order(models.Model):
+class Order(SoftDeleteModel):
     STATUS_CHOICES = (
         ('PENDING', 'Pending'),
         ('COMPLETED', 'Completed'),

@@ -132,6 +132,6 @@ def lead_delete(request, pk):
         except PartnerProfile.DoesNotExist:
             return redirect('dashboard')
             
-    lead.delete()
-    messages.success(request, 'Lead deleted!')
+    lead.soft_delete(request.user)
+    messages.success(request, 'Moved to Recycle Bin')
     return redirect('lead_list')

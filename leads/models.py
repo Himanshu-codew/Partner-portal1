@@ -1,7 +1,8 @@
+from core.models import SoftDeleteModel
 from django.db import models
 from partners.models import PartnerProfile
 
-class Lead(models.Model):
+class Lead(SoftDeleteModel):
     STATUS_CHOICES = (
         ('NEW', 'New'),
         ('IN_PROGRESS', 'In Progress'),

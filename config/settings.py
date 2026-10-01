@@ -47,6 +47,7 @@ INSTALLED_APPS = [
     'django.contrib.humanize',
 
     # Custom Apps
+    'core',
     'accounts',
     'partners',
     'leads',

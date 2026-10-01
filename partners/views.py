@@ -119,8 +119,10 @@ def partner_update(request, pk):
 def partner_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     partner = get_object_or_404(PartnerProfile, pk=pk)
-    partner.delete()
-    messages.success(request, 'Partner deleted!')
+    partner.soft_delete(request.user)
+    partner.user.is_active = False
+    partner.user.save()
+    messages.success(request, 'Moved to Recycle Bin')
     return redirect('partner_list')
 
 @login_required(login_url='/login/')
@@ -142,8 +144,10 @@ def user_update(request, pk):
 def user_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     u = get_object_or_404(User, pk=pk)
-    u.delete()
-    messages.success(request, 'User deleted!')
+    u.is_active = not u.is_active
+    u.save()
+    status = 'activated' if u.is_active else 'deactivated'
+    messages.success(request, f'User {status}!')
     return redirect('user_list')
 
 @login_required(login_url='/login/')

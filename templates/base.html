@@ -1,4 +1,4 @@
-{% load static %}
+{% load static core_extras %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -172,6 +172,15 @@
                     {% endif %}
 
                     <div class="sidebar-section-title">Administration</div>
+                    {% get_recycle_bin_count as recycle_count %}
+                    <li class="sidebar-item {% if '/recycle-bin/' in request.path %}active{% endif %}">
+                        <a href="{% url 'recycle_bin' %}" class="sidebar-link">
+                            <i class="bi bi-trash"></i> Recycle Bin
+                            {% if recycle_count > 0 %}
+                            <span class="badge bg-danger rounded-pill ms-auto">{{ recycle_count }}</span>
+                            {% endif %}
+                        </a>
+                    </li>
                     <li class="sidebar-item">
                         <a href="/admin/" target="_blank" class="sidebar-link">
                             <i class="bi bi-gear-fill"></i> Admin Panel

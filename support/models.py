@@ -1,7 +1,8 @@
+from core.models import SoftDeleteModel
 from django.db import models
 from partners.models import PartnerProfile
 
-class Ticket(models.Model):
+class Ticket(SoftDeleteModel):
     STATUS_CHOICES = (
         ('OPEN', 'Open'),
         ('IN_PROGRESS', 'In Progress'),

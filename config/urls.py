@@ -31,6 +31,7 @@ urlpatterns = [
     path('support/', include('support.urls')),
     path('resources/', include('portal_content.urls')),
     path('', include('accounts.urls')),
+    path('', include('core.urls')),
 ]
 
 from django.urls import re_path
