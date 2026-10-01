@@ -1,6 +1,9 @@
-from django.shortcuts import render
+from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
+from django.views.decorators.http import require_POST
+from django.contrib import messages
 from .models import Announcement, Document
+from .forms import AnnouncementForm, DocumentForm
 
 @login_required(login_url='/login/')
 def content_list(request):
@@ -11,10 +14,6 @@ def content_list(request):
         'announcements': announcements,
         'documents': documents
     })
-
-from django.shortcuts import redirect
-from django.contrib import messages
-from .forms import AnnouncementForm, DocumentForm
 
 @login_required(login_url='/login/')
 def announcement_create(request):
@@ -63,8 +62,6 @@ def document_list(request):
     documents = Document.objects.all().order_by('-uploaded_at')
     return render(request, 'portal_content/document_list.html', {'documents': documents})
 
-from django.shortcuts import get_object_or_404
-
 @login_required(login_url='/login/')
 def announcement_update(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
@@ -80,6 +77,7 @@ def announcement_update(request, pk):
     return render(request, 'portal_content/announcement_form.html', {'form': form, 'is_update': True})
 
 @login_required(login_url='/login/')
+@require_POST
 def announcement_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     obj = get_object_or_404(Announcement, pk=pk)
@@ -102,6 +100,7 @@ def document_update(request, pk):
     return render(request, 'portal_content/document_form.html', {'form': form, 'is_update': True})
 
 @login_required(login_url='/login/')
+@require_POST
 def document_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     obj = get_object_or_404(Document, pk=pk)

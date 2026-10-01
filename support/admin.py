@@ -6,3 +6,7 @@ class TicketAdmin(admin.ModelAdmin):
     list_display = ('subject', 'partner', 'status', 'created_at')
     list_filter = ('status', 'partner')
     search_fields = ('subject', 'partner__company_name')
+    list_editable = ('status',)
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at',)

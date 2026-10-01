@@ -1,74 +1,326 @@
 {% extends 'base.html' %}
+{% load humanize %}
 
 {% block title %}Dashboard | Partner Portal{% endblock %}
 
+{% block extra_css %}
+<style>
+.stat-card {
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    text-decoration: none;
+    color: inherit;
+    display: block;
+}
+.stat-card:hover {
+    transform: translateY(-5px);
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05) !important;
+    color: inherit;
+}
+.icon-circle {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 1.5rem;
+}
+.bg-primary-light { background-color: rgba(59, 130, 246, 0.1); color: var(--primary); }
+.bg-success-light { background-color: rgba(16, 185, 129, 0.1); color: #10b981; }
+.bg-warning-light { background-color: rgba(245, 158, 11, 0.1); color: #f59e0b; }
+.bg-info-light { background-color: rgba(14, 165, 233, 0.1); color: #0ea5e9; }
+</style>
+{% endblock %}
+
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2>Welcome back, {{ request.user.first_name|default:request.user.username }}!</h2>
-    <span class="badge bg-success p-2">Partner Account</span>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="fw-bold mb-1">Welcome back, {{ request.user.first_name|default:request.user.username }}!</h2>
+        <p class="text-muted mb-0">Here's what's happening with your account today — {% now "l, j F Y" %}</p>
+    </div>
+    <div class="mt-2 mt-md-0">
+        {% if request.user.is_staff %}
+            <span class="badge bg-primary px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-shield-lock me-1"></i> Admin</span>
+        {% else %}
+            <span class="badge bg-success px-3 py-2 rounded-pill shadow-sm"><i class="bi bi-check-circle me-1"></i> Partner</span>
+        {% endif %}
+    </div>
 </div>
 
 {% if not request.user.is_staff and not request.user.partner_profile.is_approved %}
-<div class="alert alert-warning shadow-sm border-0 mb-4">
-    <h4 class="alert-heading"><i class="bi bi-hourglass-split"></i> Account Pending Approval</h4>
-    <p>Your partner account has been created successfully, but it is currently waiting for administrator approval. You will not be able to add leads, view orders, or access resources until your account is approved.</p>
-    <hr>
-    <p class="mb-0">Please contact support if you have been waiting for more than 48 hours.</p>
+<div class="alert alert-warning shadow-sm border-0 mb-4 d-flex align-items-start">
+    <i class="bi bi-hourglass-split fs-4 me-3 mt-1"></i>
+    <div>
+        <h5 class="alert-heading fw-bold mb-1">Account Pending Approval</h5>
+        <p class="mb-1">Your partner account is currently waiting for administrator approval. You will not be able to add leads, view orders, or access resources until approved.</p>
+        <p class="mb-0 small text-muted">Please contact support if you have been waiting for more than 48 hours.</p>
+    </div>
 </div>
 {% endif %}
 
-<div class="row">
-    <!-- Stat Card 1 -->
-    <div class="col-md-3 mb-4">
-        <div class="card shadow-sm border-0 border-start border-primary border-4 h-100">
+<!-- Quick Actions -->
+<div class="mb-4 d-flex gap-2 flex-wrap">
+    {% if perms.leads.add_lead %}
+    <a href="{% url 'lead_create' %}" class="btn btn-primary shadow-sm"><i class="bi bi-plus-lg me-1"></i> Add Lead</a>
+    {% endif %}
+    {% if request.user.is_staff and perms.orders.add_order %}
+    <a href="{% url 'order_create' %}" class="btn btn-success shadow-sm"><i class="bi bi-cart-plus me-1"></i> Add Order</a>
+    {% endif %}
+    {% if perms.support.add_ticket %}
+    <a href="{% url 'ticket_create' %}" class="btn btn-outline-secondary bg-white shadow-sm"><i class="bi bi-headset me-1"></i> Raise Ticket</a>
+    {% endif %}
+</div>
+
+<!-- Stat Cards -->
+<div class="row g-4 mb-4">
+    <div class="col-sm-6 col-xl-3">
+        <a href="{% url 'lead_list' %}" class="card stat-card shadow-sm border-0 h-100 p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">Total Leads</div>
+                    <div class="h3 mb-0 fw-bold">{{ leads_count }}</div>
+                </div>
+                <div class="icon-circle bg-primary-light">
+                    <i class="bi bi-person-lines-fill"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a href="{% url 'order_list' %}" class="card stat-card shadow-sm border-0 h-100 p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">Total Orders</div>
+                    <div class="h3 mb-0 fw-bold">{{ orders_count }}</div>
+                </div>
+                <div class="icon-circle bg-success-light">
+                    <i class="bi bi-cart-check"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a href="{% url 'commission_list' %}" class="card stat-card shadow-sm border-0 h-100 p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">Earnings</div>
+                    <div class="h3 mb-0 fw-bold">₹ {{ earnings|floatformat:2|intcomma }}</div>
+                </div>
+                <div class="icon-circle bg-warning-light">
+                    <i class="bi bi-wallet2"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+    <div class="col-sm-6 col-xl-3">
+        <a href="{% url 'ticket_list' %}" class="card stat-card shadow-sm border-0 h-100 p-3">
+            <div class="d-flex align-items-center justify-content-between">
+                <div>
+                    <div class="text-muted small fw-semibold text-uppercase mb-1">Pending Tickets</div>
+                    <div class="h3 mb-0 fw-bold">{{ tickets_count }}</div>
+                </div>
+                <div class="icon-circle bg-info-light">
+                    <i class="bi bi-headset"></i>
+                </div>
+            </div>
+        </a>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <!-- Charts -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h5 class="fw-bold mb-0">Orders Over Time</h5>
+            </div>
             <div class="card-body">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Total Leads</div>
-                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ leads_count }}</div>
+                {% if orders_chart %}
+                <canvas id="ordersChart" height="100"></canvas>
+                {% else %}
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted py-5">
+                    <i class="bi bi-bar-chart text-light" style="font-size: 3rem;"></i>
+                    <p class="mt-2">No orders data available to display.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
-    
-    <!-- Stat Card 2 -->
-    <div class="col-md-3 mb-4">
-        <div class="card shadow-sm border-0 border-start border-success border-4 h-100">
-            <div class="card-body">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Total Orders</div>
-                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ orders_count }}</div>
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom-0 pt-4 pb-0">
+                <h5 class="fw-bold mb-0">Leads by Status</h5>
             </div>
-        </div>
-    </div>
-    
-    <!-- Stat Card 3 -->
-    <div class="col-md-3 mb-4">
-        <div class="card shadow-sm border-0 border-start border-info border-4 h-100">
             <div class="card-body">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Earnings</div>
-                <div class="h3 mb-0 font-weight-bold text-gray-800">₹ {{ earnings }}</div>
-            </div>
-        </div>
-    </div>
-    
-    <!-- Stat Card 4 -->
-    <div class="col-md-3 mb-4">
-        <div class="card shadow-sm border-0 border-start border-warning border-4 h-100">
-            <div class="card-body">
-                <div class="text-muted small fw-bold text-uppercase mb-1">Pending Tickets</div>
-                <div class="h3 mb-0 font-weight-bold text-gray-800">{{ tickets_count }}</div>
+                {% if leads_chart %}
+                <canvas id="leadsChart" height="200"></canvas>
+                {% else %}
+                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted py-5">
+                    <i class="bi bi-pie-chart text-light" style="font-size: 3rem;"></i>
+                    <p class="mt-2">No leads data available.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
 
-<div class="row mt-4">
-    <div class="col-md-12">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-white fw-bold">
-                Recent Activity
+<div class="row g-4">
+    <!-- Recent Activity -->
+    <div class="col-lg-8">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom pt-4 pb-3">
+                <h5 class="fw-bold mb-0">Recent Activity</h5>
             </div>
-            <div class="card-body text-center py-5 text-muted">
-                No recent activity to show yet. Add a lead to get started!
+            <div class="card-body p-0">
+                {% if recent_activity %}
+                <ul class="list-group list-group-flush">
+                    {% for item in recent_activity %}
+                    <li class="list-group-item px-4 py-3 d-flex align-items-center justify-content-between">
+                        <div class="d-flex align-items-center">
+                            <div class="icon-circle bg-{{ item.color }}-light bg-opacity-10 text-{{ item.color }} me-3" style="width: 40px; height: 40px; font-size: 1.2rem;">
+                                <i class="{{ item.icon }}"></i>
+                            </div>
+                            <div>
+                                <h6 class="mb-1 fw-semibold">{{ item.title }}</h6>
+                                <p class="mb-0 small text-muted">{{ item.type }} &bull; {{ item.created_at|timesince }} ago</p>
+                            </div>
+                        </div>
+                        <span class="badge bg-light text-dark border">{{ item.status }}</span>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-clock-history text-light mb-3" style="font-size: 3rem;"></i>
+                    <p>No recent activity to show yet.</p>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+    
+    <!-- Announcements -->
+    <div class="col-lg-4">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom pt-4 pb-3 d-flex justify-content-between align-items-center">
+                <h5 class="fw-bold mb-0">Announcements</h5>
+                {% if perms.portal_content.view_announcement %}
+                <a href="{% url 'announcement_list' %}" class="small text-decoration-none">View All</a>
+                {% endif %}
+            </div>
+            <div class="card-body p-0">
+                {% if announcements %}
+                <ul class="list-group list-group-flush">
+                    {% for ann in announcements %}
+                    <li class="list-group-item px-4 py-3">
+                        <h6 class="fw-bold mb-1">{{ ann.title }}</h6>
+                        <p class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i> {{ ann.created_at|date:"M d, Y" }}</p>
+                        <p class="small mb-0 text-truncate">{{ ann.content }}</p>
+                    </li>
+                    {% endfor %}
+                </ul>
+                {% else %}
+                <div class="text-center py-5 text-muted">
+                    <i class="bi bi-megaphone text-light mb-3" style="font-size: 3rem;"></i>
+                    <p>No active announcements.</p>
+                </div>
+                {% endif %}
             </div>
         </div>
     </div>
 </div>
+
+{{ leads_chart|json_script:"leadsChartData" }}
+{{ orders_chart|json_script:"ordersChartData" }}
+{% endblock %}
+
+{% block extra_js %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+<script>
+    document.addEventListener("DOMContentLoaded", function() {
+        // Prepare Leads Doughnut Chart
+        const leadsDataElement = document.getElementById('leadsChartData');
+        if (leadsDataElement) {
+            const leadsData = JSON.parse(leadsDataElement.textContent);
+            if (leadsData.length > 0) {
+                const labels = leadsData.map(item => item.status_label);
+                const data = leadsData.map(item => item.count);
+                
+                // Colors matching bootstrap colors approximately
+                const colorMap = {
+                    'New': '#3b82f6', // primary
+                    'In Progress': '#f59e0b', // warning
+                    'Converted': '#10b981', // success
+                    'Lost': '#ef4444' // danger
+                };
+                const bgColors = labels.map(label => colorMap[label] || '#94a3b8');
+
+                new Chart(document.getElementById('leadsChart'), {
+                    type: 'doughnut',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            data: data,
+                            backgroundColor: bgColors,
+                            borderWidth: 0,
+                            hoverOffset: 4
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: {
+                                position: 'bottom',
+                                labels: { usePointStyle: true, boxWidth: 8 }
+                            }
+                        },
+                        cutout: '75%'
+                    }
+                });
+            }
+        }
+
+        // Prepare Orders Bar Chart
+        const ordersDataElement = document.getElementById('ordersChartData');
+        if (ordersDataElement) {
+            const ordersData = JSON.parse(ordersDataElement.textContent);
+            if (ordersData.length > 0) {
+                const labels = ordersData.map(item => item.month);
+                const data = ordersData.map(item => item.count);
+
+                new Chart(document.getElementById('ordersChart'), {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: 'Orders',
+                            data: data,
+                            backgroundColor: '#10b981', // success color
+                            borderRadius: 4,
+                            barThickness: 30
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        maintainAspectRatio: false,
+                        plugins: {
+                            legend: { display: false }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                ticks: { stepSize: 1 }
+                            },
+                            x: {
+                                grid: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+        }
+    });
+</script>
 {% endblock %}

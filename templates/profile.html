@@ -3,75 +3,63 @@
 {% block title %}My Profile | Partner Portal{% endblock %}
 
 {% block content %}
-<div class="mb-4">
-    <h2><i class="bi bi-person-badge"></i> My Profile</h2>
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h2><i class="bi bi-person-badge text-primary me-2"></i> My Profile</h2>
 </div>
 
 <div class="row">
-    <div class="col-md-6">
-        <div class="card shadow-sm border-0">
-            <div class="card-header bg-primary text-white">
-                <h5 class="mb-0">Partner Details</h5>
-            </div>
-            <div class="card-body">
-                {% if profile %}
-                <table class="table table-borderless">
-                    <tr>
-                        <th class="text-muted" width="40%">Company Name:</th>
-                        <td class="fw-bold">{{ profile.company_name }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Username:</th>
-                        <td>{{ user.username }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Email:</th>
-                        <td>{{ user.email|default:"Not Provided" }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Phone Number:</th>
-                        <td>{{ profile.phone_number }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Address:</th>
-                        <td>{{ profile.address|default:"Not Provided" }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Account Status:</th>
-                        <td>
-                            {% if profile.is_approved %}
-                            <span class="badge bg-success">Approved</span>
-                            {% else %}
-                            <span class="badge bg-warning text-dark">Pending Approval</span>
-                            {% endif %}
-                        </td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Member Since:</th>
-                        <td>{{ profile.created_at|date:"F Y" }}</td>
-                    </tr>
-                </table>
-                {% elif user.is_staff %}
-                <div class="alert alert-info mb-4">
-                    You are logged in as a System Administrator.
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
+            <div class="card-header bg-primary bg-gradient text-white py-4 text-center border-0">
+                <div class="user-avatar bg-white text-primary mx-auto mb-3 shadow" style="width: 80px; height: 80px; font-size: 2.5rem;">
+                    {{ user.username|make_list|first|upper }}
                 </div>
-                <table class="table table-borderless">
-                    <tr>
-                        <th class="text-muted" width="40%">Role:</th>
-                        <td class="fw-bold text-primary">Master Admin</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Username:</th>
-                        <td>{{ user.username }}</td>
-                    </tr>
-                    <tr>
-                        <th class="text-muted">Email:</th>
-                        <td>{{ user.email|default:"Not Provided" }}</td>
-                    </tr>
-                </table>
+                <h4 class="mb-1 fw-bold">{{ profile.company_name|default:"System Administrator" }}</h4>
+                <p class="mb-0 text-white-50">{{ user.email|default:"No email provided" }}</p>
+            </div>
+            <div class="card-body p-4">
+                {% if profile %}
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><i class="bi bi-person me-2"></i> Username</span>
+                        <span class="fw-semibold text-dark">{{ user.username }}</span>
+                    </li>
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><i class="bi bi-telephone me-2"></i> Phone</span>
+                        <span class="fw-semibold text-dark">{{ profile.phone_number }}</span>
+                    </li>
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><i class="bi bi-geo-alt me-2"></i> Address</span>
+                        <span class="fw-semibold text-dark text-end">{{ profile.address|default:"Not Provided" }}</span>
+                    </li>
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
+                        <span class="text-muted"><i class="bi bi-shield-check me-2"></i> Status</span>
+                        <span>
+                            {% if profile.is_approved %}
+                            <span class="badge bg-success rounded-pill px-3 py-2">Approved</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2">Pending Approval</span>
+                            {% endif %}
+                        </span>
+                    </li>
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                        <span class="text-muted"><i class="bi bi-calendar3 me-2"></i> Member Since</span>
+                        <span class="fw-semibold text-dark">{{ profile.created_at|date:"F j, Y" }}</span>
+                    </li>
+                </ul>
+                {% elif user.is_staff %}
+                <div class="alert alert-info border-0 shadow-sm rounded mb-4">
+                    <i class="bi bi-info-circle-fill me-2"></i> You are logged in as a System Administrator.
+                </div>
+                <ul class="list-group list-group-flush">
+                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center border-bottom-0">
+                        <span class="text-muted"><i class="bi bi-shield-lock me-2"></i> Role</span>
+                        <span class="badge bg-primary rounded-pill px-3 py-2">Master Admin</span>
+                    </li>
+                </ul>
                 {% else %}
-                <div class="alert alert-warning mb-0">
-                    Your partner profile is not completely set up yet. Please contact the administrator.
+                <div class="alert alert-warning border-0 shadow-sm rounded mb-0">
+                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Your partner profile is not completely set up yet. Please contact the administrator.
                 </div>
                 {% endif %}
             </div>

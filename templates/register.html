@@ -1,82 +1,210 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Register | Partner Portal</title>
-    <!-- Bootstrap CSS -->
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <!-- Bootstrap Icons -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
-    <style>
-        body {
-            background-color: #f8f9fc;
-            height: 100vh;
-            display: flex;
-            align-items: center;
-        }
-    </style>
-</head>
-<body>
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-5">
-                <div class="card shadow-lg border-0 rounded-lg mt-5">
-                    <div class="card-header bg-dark text-white text-center py-4">
-                        <h3 class="font-weight-light my-1"><i class="bi bi-rocket-takeoff"></i> Partner Sign Up</h3>
-                    </div>
-                    <div class="card-body p-4">
-                        {% if form.errors %}
-                            <div class="alert alert-danger">
-                                Please correct the errors below.
-                                {{ form.errors }}
-                            </div>
-                        {% endif %}
-                        <form method="post">
-                            {% csrf_token %}
-                            <div class="mb-3">
-                                <label class="small mb-1 fw-bold">Username <span class="text-danger">*</span></label>
-                                {{ form.username }}
-                            </div>
-                            
-                            <div class="mb-3">
-                                <label class="small mb-1 fw-bold">Company Name <span class="text-danger">*</span></label>
-                                {{ form.company_name }}
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="small mb-1 fw-bold">Phone Number <span class="text-danger">*</span></label>
-                                    {{ form.phone_number }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="small mb-1 fw-bold">Email Address</label>
-                                    {{ form.email }}
-                                </div>
-                            </div>
-                            
-                            <div class="row mb-3">
-                                <div class="col-md-6">
-                                    <label class="small mb-1 fw-bold">Password <span class="text-danger">*</span></label>
-                                    {{ form.password }}
-                                </div>
-                                <div class="col-md-6">
-                                    <label class="small mb-1 fw-bold">Confirm Password <span class="text-danger">*</span></label>
-                                    {{ form.confirm_password }}
-                                </div>
-                            </div>
-                            
-                            <div class="d-grid mt-4">
-                                <button type="submit" class="btn btn-primary btn-lg">Apply for Partner Account</button>
-                            </div>
-                        </form>
-                    </div>
-                    <div class="card-footer text-center py-3 bg-light">
-                        <div class="small"><a href="{% url 'login' %}">Already have an account? Go to login</a></div>
-                    </div>
-                </div>
-            </div>
+{% extends 'base.html' %}
+
+{% block title %}Register | Partner Portal{% endblock %}
+
+{% block extra_css %}
+<style>
+.auth-wrapper {
+    min-height: 100vh;
+    display: flex;
+    flex-wrap: wrap;
+    background: var(--bg-color);
+}
+.auth-panel {
+    background: linear-gradient(135deg, #1e3a8a 0%, #6d28d9 100%);
+    color: white;
+    position: relative;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 3rem;
+}
+.auth-panel::before, .auth-panel::after {
+    content: '';
+    position: absolute;
+    border-radius: 50%;
+    filter: blur(60px);
+    z-index: 0;
+}
+.auth-panel::before {
+    width: 300px; height: 300px; background: rgba(59, 130, 246, 0.4); top: -100px; left: -100px;
+}
+.auth-panel::after {
+    width: 250px; height: 250px; background: rgba(236, 72, 153, 0.3); bottom: -50px; right: -50px;
+}
+.auth-panel-content { position: relative; z-index: 1; }
+.auth-form-container {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    padding: 2rem;
+}
+@media (min-width: 768px) {
+    .auth-panel { flex: 0 0 45%; max-width: 45%; }
+    .auth-form-container { flex: 0 0 55%; max-width: 55%; padding: 4rem; }
+}
+@media (max-width: 767.98px) {
+    .auth-panel { padding: 2rem; }
+}
+.auth-form-card {
+    background: var(--surface);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+    padding: 2.5rem;
+    max-width: 500px;
+    width: 100%;
+    margin: 0 auto;
+}
+</style>
+{% endblock %}
+
+{% block auth_content %}
+<div class="auth-wrapper">
+    <div class="auth-panel">
+        <div class="auth-panel-content">
+            <h1 class="display-5 fw-bold mb-3"><i class="bi bi-rocket-takeoff text-info me-2"></i> Partner Portal</h1>
+            <h2 class="h3 mb-4 text-white-50">Grow with our Partner Network</h2>
+            <p class="lead mb-4">Join forces with us to expand your business and increase your revenue.</p>
+            <ul class="list-unstyled fs-5">
+                <li class="mb-3"><i class="bi bi-check-circle-fill text-success me-2"></i> Track your leads</li>
+                <li class="mb-3"><i class="bi bi-wallet-fill text-warning me-2"></i> Earn commissions</li>
+                <li class="mb-3"><i class="bi bi-headset text-info me-2"></i> Get priority support</li>
+            </ul>
         </div>
     </div>
-</body>
-</html>
+    
+    <div class="auth-form-container">
+        <div class="auth-form-card border">
+            <h3 class="mb-4 fw-bold text-center">Partner Sign Up</h3>
+            
+            {% if form.non_field_errors %}
+                <div class="alert alert-danger">
+                    {{ form.non_field_errors }}
+                </div>
+            {% endif %}
+
+            <form method="post" id="registerForm" novalidate>
+                {% csrf_token %}
+                
+                <div class="mb-3">
+                    <label for="{{ form.username.id_for_label }}" class="form-label fw-semibold">Username <span class="text-danger">*</span></label>
+                    <input type="text" name="{{ form.username.name }}" id="{{ form.username.id_for_label }}" class="form-control {% if form.username.errors %}is-invalid{% endif %}" {% if form.username.value %}value="{{ form.username.value }}"{% endif %} required>
+                    {% if form.username.errors %}
+                        <div class="invalid-feedback">{{ form.username.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="mb-3">
+                    <label for="{{ form.company_name.id_for_label }}" class="form-label fw-semibold">Company Name <span class="text-danger">*</span></label>
+                    <input type="text" name="{{ form.company_name.name }}" id="{{ form.company_name.id_for_label }}" class="form-control {% if form.company_name.errors %}is-invalid{% endif %}" {% if form.company_name.value %}value="{{ form.company_name.value }}"{% endif %} required>
+                    {% if form.company_name.errors %}
+                        <div class="invalid-feedback">{{ form.company_name.errors|striptags }}</div>
+                    {% endif %}
+                </div>
+                
+                <div class="row mb-3">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label for="{{ form.phone_number.id_for_label }}" class="form-label fw-semibold">Phone Number <span class="text-danger">*</span></label>
+                        <input type="text" name="{{ form.phone_number.name }}" id="{{ form.phone_number.id_for_label }}" class="form-control {% if form.phone_number.errors %}is-invalid{% endif %}" {% if form.phone_number.value %}value="{{ form.phone_number.value }}"{% endif %} required>
+                        {% if form.phone_number.errors %}
+                            <div class="invalid-feedback">{{ form.phone_number.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.email.id_for_label }}" class="form-label fw-semibold">Email Address</label>
+                        <input type="email" name="{{ form.email.name }}" id="{{ form.email.id_for_label }}" class="form-control {% if form.email.errors %}is-invalid{% endif %}" {% if form.email.value %}value="{{ form.email.value }}"{% endif %}>
+                        {% if form.email.errors %}
+                            <div class="invalid-feedback">{{ form.email.errors|striptags }}</div>
+                        {% endif %}
+                    </div>
+                </div>
+                
+                <div class="row mb-4">
+                    <div class="col-md-6 mb-3 mb-md-0">
+                        <label for="{{ form.password.id_for_label }}" class="form-label fw-semibold">Password <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password" name="{{ form.password.name }}" id="{{ form.password.id_for_label }}" class="form-control {% if form.password.errors %}is-invalid{% endif %}" required>
+                            <button class="btn btn-outline-secondary toggle-pwd" type="button" tabindex="-1">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            {% if form.password.errors %}
+                                <div class="invalid-feedback">{{ form.password.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="form-text mt-1" id="pwdHint" style="font-size: 0.75rem;">Password must be at least 8 characters.</div>
+                    </div>
+                    <div class="col-md-6">
+                        <label for="{{ form.confirm_password.id_for_label }}" class="form-label fw-semibold">Confirm Password <span class="text-danger">*</span></label>
+                        <div class="input-group">
+                            <input type="password" name="{{ form.confirm_password.name }}" id="{{ form.confirm_password.id_for_label }}" class="form-control {% if form.confirm_password.errors %}is-invalid{% endif %}" required>
+                            <button class="btn btn-outline-secondary toggle-pwd" type="button" tabindex="-1">
+                                <i class="bi bi-eye"></i>
+                            </button>
+                            {% if form.confirm_password.errors %}
+                                <div class="invalid-feedback">{{ form.confirm_password.errors|striptags }}</div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="d-grid mt-4">
+                    <button type="submit" class="btn btn-primary btn-lg" id="submitBtn">
+                        <span class="btn-text">Apply for Partner Account</span>
+                        <span class="spinner-border spinner-border-sm d-none" role="status" aria-hidden="true"></span>
+                    </button>
+                </div>
+                
+                <div class="text-center mt-4 pt-3 border-top">
+                    <a href="{% url 'login' %}" class="text-decoration-none fw-semibold">Already have an account? Go to login</a>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block extra_js %}
+<script>
+    document.querySelectorAll('.toggle-pwd').forEach(button => {
+        button.addEventListener('click', function() {
+            const input = this.previousElementSibling;
+            const icon = this.querySelector('i');
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.classList.replace('bi-eye', 'bi-eye-slash');
+            } else {
+                input.type = 'password';
+                icon.classList.replace('bi-eye-slash', 'bi-eye');
+            }
+        });
+    });
+    
+    // Simple password strength hint (just visual, no validation blocks)
+    const pwdInput = document.getElementById('{{ form.password.id_for_label }}');
+    const pwdHint = document.getElementById('pwdHint');
+    if (pwdInput && pwdHint) {
+        pwdInput.addEventListener('input', function() {
+            const val = this.value;
+            if (val.length === 0) {
+                pwdHint.textContent = 'Password must be at least 8 characters.';
+                pwdHint.className = 'form-text mt-1 text-muted';
+            } else if (val.length < 8) {
+                pwdHint.textContent = 'Too short';
+                pwdHint.className = 'form-text mt-1 text-danger';
+            } else {
+                pwdHint.textContent = 'Looks good';
+                pwdHint.className = 'form-text mt-1 text-success';
+            }
+        });
+    }
+
+    document.getElementById('registerForm').addEventListener('submit', function() {
+        const btn = document.getElementById('submitBtn');
+        // Only disable if form is valid enough for browser (or we rely on server side)
+        // Since we have novalidate, we just show spinner
+        btn.querySelector('.btn-text').textContent = 'Applying...';
+        btn.querySelector('.spinner-border').classList.remove('d-none');
+    });
+</script>
+{% endblock %}

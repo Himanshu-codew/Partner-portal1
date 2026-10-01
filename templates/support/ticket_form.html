@@ -1,35 +1,37 @@
 {% extends 'base.html' %}
 
-{% block title %}Create Support Ticket | Partner Portal{% endblock %}
+{% block title %}{% if is_update %}Edit Ticket{% else %}Create Ticket{% endif %} | Partner Portal{% endblock %}
 
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-headset"></i> Create Support Ticket</h2>
-    <a href="{% url 'ticket_list' %}" class="btn btn-outline-secondary"><i class="bi bi-arrow-left"></i> Back to Tickets</a>
+    <h2><i class="bi bi-headset text-warning me-2"></i> {% if is_update %}Edit Ticket{% else %}Create Ticket{% endif %}</h2>
 </div>
 
 <div class="row">
-    <div class="col-md-8 mx-auto">
+    <div class="col-md-8 col-lg-6">
         <div class="card shadow-sm border-0">
-            <div class="card-header bg-primary text-white py-3">
-                <h5 class="mb-0">Describe your issue</h5>
+            <div class="card-header bg-white border-bottom py-3">
+                <h5 class="mb-0 fw-bold">Ticket Details</h5>
             </div>
             <div class="card-body p-4">
-                <form method="post">
+                <form method="post" novalidate>
                     {% csrf_token %}
                     
-                    <div class="mb-3">
-                        <label class="form-label fw-bold">Subject <span class="text-danger">*</span></label>
-                        {{ form.subject }}
+                    {% if form.non_field_errors %}
+                    <div class="alert alert-danger shadow-sm border-0 mb-4">
+                        <ul class="mb-0 ps-3">
+                            {% for error in form.non_field_errors %}
+                                <li>{{ error }}</li>
+                            {% endfor %}
+                        </ul>
                     </div>
+                    {% endif %}
+
+                    {{ form.as_p }}
                     
-                    <div class="mb-4">
-                        <label class="form-label fw-bold">Description / Query <span class="text-danger">*</span></label>
-                        {{ form.description }}
-                    </div>
-                    
-                    <div class="d-grid gap-2">
-                        <button type="submit" class="btn btn-success btn-lg">Submit Ticket</button>
+                    <div class="d-flex gap-2 mt-4 pt-3 border-top">
+                        <button type="submit" class="btn btn-warning px-4"><i class="bi bi-send me-1"></i> Submit Ticket</button>
+                        <a href="{% url 'ticket_list' %}" class="btn btn-light px-4">Cancel</a>
                     </div>
                 </form>
             </div>

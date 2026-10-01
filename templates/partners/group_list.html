@@ -26,10 +26,7 @@
                         <td>{{ group.permissions.count }} permissions</td>
                         <td>
                             <a href="{% url 'group_update' group.pk %}" class="btn btn-sm btn-outline-primary"><i class="bi bi-pencil"></i></a>
-                            <form action="{% url 'group_delete' group.pk %}" method="post" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this group?');">
-                                {% csrf_token %}
-                                <button type="submit" class="btn btn-sm btn-outline-danger"><i class="bi bi-trash"></i></button>
-                            </form>
+                            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'group_delete' group.pk %}" data-message="Are you sure you want to delete this item?"><i class="bi bi-trash"></i></button>
                         </td>
                     </tr>
                     {% empty %}

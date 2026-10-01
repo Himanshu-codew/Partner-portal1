@@ -6,3 +6,7 @@ class OrderAdmin(admin.ModelAdmin):
     list_display = ('order_number', 'partner', 'amount', 'commission_amount', 'is_commission_paid', 'status', 'created_at')
     list_filter = ('status', 'is_commission_paid', 'partner')
     search_fields = ('order_number', 'partner__company_name')
+    list_editable = ('is_commission_paid', 'status')
+    date_hierarchy = 'created_at'
+    ordering = ('-created_at',)
+    readonly_fields = ('created_at',)
