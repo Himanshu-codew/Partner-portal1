@@ -18,7 +18,10 @@ def dashboard(request):
         leads_qs = Lead.objects.all()
         orders_qs = Order.objects.all()
         tickets_qs = Ticket.objects.all()
-        earnings = Order.objects.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
+        # Admin earnings = Total amount collected - Total commission paid to partners
+        total_collected = Order.objects.aggregate(total=Sum('amount'))['total'] or 0
+        commission_paid = Order.objects.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
+        earnings = total_collected - commission_paid
     else:
         try:
             profile = request.user.partner_profile
