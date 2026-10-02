@@ -1,35 +1,39 @@
 {% load humanize %}
 <div class="card shadow-sm border-0 h-100">
-    <div class="card-header bg-white border-bottom pt-4 pb-3 d-flex justify-content-between align-items-center">
+    <div class="card-header border-bottom pt-4 pb-3 d-flex justify-content-between align-items-center">
         <h5 class="fw-bold mb-0">Commission Summary</h5>
         <a href="{% url 'commission_list' %}" class="small text-decoration-none">Details</a>
     </div>
     <div class="card-body">
         {% if commission_summary.total > 0 %}
         <h3 class="fw-bold mb-4">₹ {{ commission_summary.total|floatformat:0|intcomma }}</h3>
-        
+
         <div class="d-flex justify-content-between mb-1 small fw-semibold">
-            <span class="text-success">Paid: {{ commission_summary.paid_percent }}%</span>
-            <span class="text-warning text-dark">Pending: {{ commission_summary.pending_percent }}%</span>
+            <span style="color: var(--success);">Paid: {{ commission_summary.paid_percent }}%</span>
+            <span class="text-pending">Pending: {{ commission_summary.pending_percent }}%</span>
         </div>
         <div class="progress mb-4" style="height: 10px; border-radius: 5px;">
-            <div class="progress-bar bg-success" role="progressbar" style="width: {{ commission_summary.paid_percent }}%;" aria-valuenow="{{ commission_summary.paid_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
-            <div class="progress-bar bg-warning" role="progressbar" style="width: {{ commission_summary.pending_percent }}%;" aria-valuenow="{{ commission_summary.pending_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+            <div class="progress-bar bg-success" role="progressbar"
+                 style="width: {{ commission_summary.paid_percent }}%;"
+                 aria-valuenow="{{ commission_summary.paid_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
+            <div class="progress-bar bg-warning" role="progressbar"
+                 style="width: {{ commission_summary.pending_percent }}%;"
+                 aria-valuenow="{{ commission_summary.pending_percent }}" aria-valuemin="0" aria-valuemax="100"></div>
         </div>
-        
-        <div class="d-flex justify-content-between border-top pt-3">
+
+        <div class="d-flex justify-content-between border-top pt-3" style="border-color: var(--border) !important;">
             <div>
-                <p class="text-muted small mb-0">Total Paid</p>
-                <h6 class="fw-bold mb-0 text-success">₹ {{ commission_summary.paid|floatformat:0|intcomma }}</h6>
+                <p class="small mb-0" style="color: var(--text-muted);">Total Paid</p>
+                <h6 class="fw-bold mb-0" style="color: var(--success);">₹ {{ commission_summary.paid|floatformat:0|intcomma }}</h6>
             </div>
             <div class="text-end">
-                <p class="text-muted small mb-0">Total Pending</p>
-                <h6 class="fw-bold mb-0 text-warning text-dark">₹ {{ commission_summary.pending|floatformat:0|intcomma }}</h6>
+                <p class="small mb-0" style="color: var(--text-muted);">Total Pending</p>
+                <h6 class="fw-bold mb-0 text-pending">₹ {{ commission_summary.pending|floatformat:0|intcomma }}</h6>
             </div>
         </div>
         {% else %}
         <div class="text-center py-5 text-muted">
-            <i class="bi bi-wallet2 text-light mb-3" style="font-size: 3rem;"></i>
+            <i class="bi bi-wallet2 mb-3" style="font-size: 3rem; display:block; opacity:0.3;"></i>
             <p>No commission data available yet.</p>
         </div>
         {% endif %}

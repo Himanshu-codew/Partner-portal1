@@ -6,4 +6,6 @@ urlpatterns = [
     path('recycle-bin/restore/<str:model_name>/<int:pk>/', views.restore_item, name='restore_item'),
     path('recycle-bin/delete/<str:model_name>/<int:pk>/', views.hard_delete_item, name='hard_delete_item'),
     path('recycle-bin/empty/<str:model_name>/', views.empty_bin, name='empty_bin'),
+    path('notifications/feed/', views.notifications_feed, name='notifications_feed'),
+    path('notifications/mark-read/', views.notifications_mark_read, name='notifications_mark_read'),
 ]

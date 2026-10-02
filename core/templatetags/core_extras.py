@@ -13,25 +13,40 @@ def get_recycle_bin_count():
 
 @register.simple_tag(takes_context=True)
 def get_notifications_count(context):
+    """Return count of unread notifications (items created after last_read_at)."""
     request = context.get('request')
     if not request or not request.user.is_authenticated:
         return 0
     from support.models import Ticket
+    from partners.models import PartnerProfile
+    from leads.models import Lead
+    from orders.models import Order
     from portal_content.models import Announcement
+    from core.models import UserNotificationRead
     from django.utils import timezone
     import datetime
-    
-    recent_date = timezone.now() - datetime.timedelta(days=7)
-    announcements = Announcement.objects.filter(is_active=True, created_at__gte=recent_date).count()
-    
-    tickets = 0
-    if request.user.is_staff:
-        tickets = Ticket.objects.filter(status__in=['OPEN', 'IN_PROGRESS']).count()
+
+    user = request.user
+
+    # Get last-read timestamp
+    try:
+        last_read = user.notification_read.last_read_at
+    except UserNotificationRead.DoesNotExist:
+        last_read = timezone.now() - datetime.timedelta(days=7)
+
+    count = 0
+    if user.is_staff:
+        count += Ticket.objects.filter(status__in=['OPEN', 'IN_PROGRESS'], created_at__gt=last_read).count()
+        count += PartnerProfile.objects.filter(is_approved=False, is_deleted=False, created_at__gt=last_read).count()
+        count += Lead.objects.filter(created_at__gt=last_read).count()
+        count += Order.objects.filter(created_at__gt=last_read).count()
     else:
         try:
-            profile = request.user.partner_profile
-            tickets = Ticket.objects.filter(partner=profile, status__in=['OPEN', 'IN_PROGRESS']).count()
-        except:
+            profile = user.partner_profile
+            count += Ticket.objects.filter(partner=profile, updated_at__gt=last_read).count()
+            count += Lead.objects.filter(partner=profile, created_at__gt=last_read).count()
+            count += Order.objects.filter(partner=profile, is_commission_paid=True, created_at__gt=last_read).count()
+        except Exception:
             pass
-            
-    return announcements + tickets
+
+    return min(count, 99)  # cap display

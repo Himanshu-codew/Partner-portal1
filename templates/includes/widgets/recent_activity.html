@@ -1,28 +1,28 @@
 <div class="card shadow-sm border-0 h-100">
-    <div class="card-header bg-white border-bottom pt-4 pb-3">
+    <div class="card-header border-bottom pt-4 pb-3">
         <h5 class="fw-bold mb-0">Recent Activity</h5>
     </div>
     <div class="card-body p-0">
         {% if recent_activity %}
         <ul class="list-group list-group-flush">
-            {% for item in recent_activity %}
-            <li class="list-group-item px-4 py-3 d-flex align-items-center justify-content-between">
-                <div class="d-flex align-items-center">
-                    <div class="icon-circle bg-{{ item.color }}-light bg-opacity-10 text-{{ item.color }} me-3" style="width: 40px; height: 40px; font-size: 1.2rem;">
+            {% for item in recent_activity|slice:":6" %}
+            <li class="list-group-item border-0 p-0">
+                <div class="widget-item">
+                    <div class="widget-icon-wrap bg-{{ item.color }}-light">
                         <i class="{{ item.icon }}"></i>
                     </div>
-                    <div>
-                        <h6 class="mb-1 fw-semibold">{{ item.title }}</h6>
-                        <p class="mb-0 small text-muted">{{ item.type }} &bull; {{ item.created_at|timesince }} ago</p>
+                    <div class="widget-item-body">
+                        <div class="widget-item-title">{{ item.title }}</div>
+                        <p class="widget-item-meta">{{ item.type }} &bull; {{ item.created_at|timesince }} ago</p>
                     </div>
+                    <span class="widget-item-badge badge bg-secondary">{{ item.status }}</span>
                 </div>
-                <span class="badge bg-light text-dark border">{{ item.status }}</span>
             </li>
             {% endfor %}
         </ul>
         {% else %}
         <div class="text-center py-5 text-muted">
-            <i class="bi bi-clock-history text-light mb-3" style="font-size: 3rem;"></i>
+            <i class="bi bi-clock-history mb-3" style="font-size: 3rem; display:block; opacity:0.3;"></i>
             <p>No recent activity to show yet.</p>
         </div>
         {% endif %}

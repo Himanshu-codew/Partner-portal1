@@ -2,6 +2,15 @@ from django.db import models
 from django.utils import timezone
 from django.contrib.auth.models import User
 
+
+class UserNotificationRead(models.Model):
+    """Tracks when a user last read their notifications."""
+    user = models.OneToOneField(User, on_delete=models.CASCADE, related_name='notification_read')
+    last_read_at = models.DateTimeField(default=timezone.now)
+
+    def __str__(self):
+        return f"{self.user.username} last read at {self.last_read_at}"
+
 class SoftDeleteQuerySet(models.QuerySet):
     def delete(self, user=None):
         return super().update(is_deleted=True, deleted_at=timezone.now(), deleted_by=user)

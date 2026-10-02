@@ -1,61 +1,83 @@
 {% load core_extras %}
-<div class="topbar d-flex align-items-center justify-content-between px-3 py-2 bg-white shadow-sm sticky-top" style="z-index: 1030; background-color: var(--surface) !important; border-bottom: 1px solid var(--border);">
+<div class="topbar d-flex align-items-center justify-content-between px-3 py-2 shadow-sm sticky-top" style="z-index: 1030; background-color: var(--surface) !important; border-bottom: 1px solid var(--border);">
     <div class="d-flex align-items-center">
         <!-- Mobile Toggle -->
-        <button class="btn border-0 p-0 fs-4 text-secondary d-md-none me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas">
+        <button class="btn border-0 p-0 fs-4 d-md-none me-3" type="button"
+                style="color: var(--text-muted);"
+                data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas">
             <i class="bi bi-list"></i>
         </button>
-        
+
         <!-- Search Input -->
         <div class="input-group d-none d-sm-flex" style="width: 250px;">
-            <span class="input-group-text bg-light border-end-0 text-muted" style="background-color: var(--bg-color) !important; border-color: var(--border) !important;"><i class="bi bi-search"></i></span>
-            <input type="text" class="form-control bg-light border-start-0" placeholder="Search leads, orders..." style="background-color: var(--bg-color) !important; border-color: var(--border) !important; color: var(--text-main);">
+            <span class="input-group-text border-end-0"
+                  style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-muted);">
+                <i class="bi bi-search"></i>
+            </span>
+            <input type="text" class="form-control border-start-0" placeholder="Search leads, orders..."
+                   style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-main);">
         </div>
     </div>
-    
+
     <div class="d-flex align-items-center gap-3">
         <!-- Theme Toggle -->
-        <button id="themeToggleBtn" class="btn btn-link text-secondary p-0 text-decoration-none fs-5">
+        <button id="themeToggleBtn" class="btn btn-link p-0 text-decoration-none fs-5"
+                style="color: var(--text-muted);" title="Toggle theme" aria-label="Toggle theme">
             <i class="bi bi-moon-stars" id="themeIcon"></i>
         </button>
 
-        <!-- Notifications -->
-        <div class="dropdown">
+        <!-- Notifications Bell -->
+        <div class="dropdown" id="notifDropdownWrap">
             {% get_notifications_count as topbar_notifications_count %}
-            <button class="btn btn-link text-secondary p-0 text-decoration-none fs-5 position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+            <button class="btn btn-link p-0 text-decoration-none fs-5 position-relative"
+                    style="color: var(--text-muted);"
+                    id="notifBell"
+                    type="button"
+                    aria-label="Notifications"
+                    title="Notifications">
                 <i class="bi bi-bell"></i>
-                {% if topbar_notifications_count > 0 %}
-                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
-                    {{ topbar_notifications_count }}
+                <span id="notifBadge"
+                      class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger"
+                      style="font-size: 0.62rem; {% if not topbar_notifications_count %}display:none;{% endif %}">
+                    {% if topbar_notifications_count > 9 %}9+{% else %}{{ topbar_notifications_count }}{% endif %}
                 </span>
-                {% endif %}
             </button>
-            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 p-0" style="width: 280px;">
-                <li class="p-3 border-bottom text-muted fw-bold" style="border-color: var(--border) !important;">Notifications</li>
-                {% if topbar_notifications_count > 0 %}
-                    <li class="p-3 text-center text-muted small">You have {{ topbar_notifications_count }} new notification(s).</li>
-                {% else %}
-                    <li class="p-3 text-center text-muted small">No new notifications</li>
-                {% endif %}
-            </ul>
+
+            <!-- Notification panel (not a Bootstrap dropdown-menu — manually toggled) -->
+            <div id="notifPanel" class="notif-dropdown position-absolute dropdown-menu-end" style="display:none; right:0; top: calc(100% + 8px);">
+                <div class="notif-header">
+                    <h6>Notifications</h6>
+                    <button id="markAllRead" class="btn btn-link btn-sm p-0 text-decoration-none small" style="color: var(--primary);">Mark all as read</button>
+                </div>
+                <div id="notifList">
+                    <div class="text-center py-4 text-muted small" id="notifLoading">
+                        <i class="bi bi-arrow-repeat" style="animation: spin 1s linear infinite; display:inline-block;"></i> Loading…
+                    </div>
+                </div>
+                <div class="notif-footer">
+                    <a href="/" class="small text-decoration-none" style="color: var(--text-muted);">Go to Dashboard</a>
+                </div>
+            </div>
         </div>
 
         <!-- User Dropdown -->
         <div class="dropdown ms-1">
-            <div class="user-avatar shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.1rem;">
+            <div class="user-avatar shadow-sm"
+                 data-bs-toggle="dropdown" aria-expanded="false"
+                 style="cursor:pointer;">
                 {{ request.user.username|make_list|first|upper }}
             </div>
             <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
                 <li class="px-3 py-2 border-bottom mb-1">
                     <div class="fw-bold">{{ request.user.get_full_name|default:request.user.username }}</div>
-                    <div class="small text-muted">{{ request.user.email }}</div>
+                    <div class="small" style="color: var(--text-muted);">{{ request.user.email }}</div>
                 </li>
-                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i> Profile</a></li>
+                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <form action="{% url 'logout' %}" method="post">
                         {% csrf_token %}
-                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i> Logout</button>
+                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i>Logout</button>
                     </form>
                 </li>
             </ul>
@@ -63,37 +85,142 @@
     </div>
 </div>
 
+<style>
+@keyframes spin { to { transform: rotate(360deg); } }
+</style>
+
 <script>
-document.addEventListener("DOMContentLoaded", function() {
-    const themeBtn = document.getElementById('themeToggleBtn');
+document.addEventListener("DOMContentLoaded", function () {
+
+    /* ── Theme toggle ── */
+    const themeBtn  = document.getElementById('themeToggleBtn');
     const themeIcon = document.getElementById('themeIcon');
-    
-    function updateIcon(theme) {
-        if (theme === 'dark') {
-            themeIcon.classList.remove('bi-moon-stars');
-            themeIcon.classList.add('bi-sun');
-        } else {
-            themeIcon.classList.remove('bi-sun');
-            themeIcon.classList.add('bi-moon-stars');
-        }
+
+    function updateThemeIcon(theme) {
+        themeIcon.className = theme === 'dark' ? 'bi bi-sun' : 'bi bi-moon-stars';
     }
-    
-    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
-    updateIcon(currentTheme);
-    
+    updateThemeIcon(document.documentElement.getAttribute('data-theme') || 'light');
+
     if (themeBtn) {
-        themeBtn.addEventListener('click', function() {
-            let newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-            
+        themeBtn.addEventListener('click', function () {
+            const newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
             document.documentElement.setAttribute('data-theme', newTheme);
             document.documentElement.setAttribute('data-bs-theme', newTheme);
             localStorage.setItem('theme', newTheme);
-            
-            updateIcon(newTheme);
-            
-            // Dispatch event for charts to update colors if needed
+            updateThemeIcon(newTheme);
             window.dispatchEvent(new Event('themeChanged'));
         });
     }
+
+    /* ── Notification panel ── */
+    const bell       = document.getElementById('notifBell');
+    const panel      = document.getElementById('notifPanel');
+    const notifList  = document.getElementById('notifList');
+    const notifBadge = document.getElementById('notifBadge');
+    const markAllBtn = document.getElementById('markAllRead');
+
+    let panelOpen    = false;
+    let loaded       = false;
+
+    function csrfToken() {
+        return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
+    }
+
+    function colorClass(c) {
+        const map = { danger:'bg-danger-light', primary:'bg-primary-light', success:'bg-success-light', warning:'bg-warning-light', info:'bg-info-light' };
+        return map[c] || 'bg-secondary';
+    }
+
+    function renderNotifications(data) {
+        const items = data.notifications || [];
+        const unreadCount = data.unread_count || 0;
+
+        // Update badge
+        if (unreadCount > 0) {
+            notifBadge.textContent = unreadCount > 9 ? '9+' : String(unreadCount);
+            notifBadge.style.display = '';
+        } else {
+            notifBadge.style.display = 'none';
+        }
+
+        if (items.length === 0) {
+            notifList.innerHTML = `
+                <div class="text-center py-5" style="color: var(--text-muted);">
+                    <i class="bi bi-bell-slash mb-2" style="font-size:2rem; display:block; opacity:0.4;"></i>
+                    <p class="small mb-0">You're all caught up!</p>
+                </div>`;
+            return;
+        }
+
+        notifList.innerHTML = items.map(n => `
+            <a href="${n.url}" class="notif-item ${n.unread ? 'unread' : ''}">
+                <div class="notif-icon ${colorClass(n.color)}">
+                    <i class="${n.icon}"></i>
+                </div>
+                <div class="notif-body">
+                    <div class="notif-title">${n.title}</div>
+                    <div class="notif-msg">${n.msg}</div>
+                    <div class="notif-time">${n.time}</div>
+                </div>
+            </a>`).join('');
+    }
+
+    function loadNotifications() {
+        notifList.innerHTML = `<div class="text-center py-4 small" style="color:var(--text-muted);" id="notifLoading"><i class="bi bi-arrow-repeat" style="animation:spin 1s linear infinite;display:inline-block;"></i> Loading…</div>`;
+        fetch('/notifications/feed/', { credentials: 'same-origin' })
+            .then(r => r.json())
+            .then(data => renderNotifications(data))
+            .catch(() => {
+                notifList.innerHTML = `<div class="text-center py-4 small text-danger">Failed to load.</div>`;
+            });
+    }
+
+    function openPanel() {
+        panel.style.display = 'block';
+        panelOpen = true;
+        if (!loaded) { loadNotifications(); loaded = true; }
+    }
+
+    function closePanel() {
+        panel.style.display = 'none';
+        panelOpen = false;
+    }
+
+    bell.addEventListener('click', function (e) {
+        e.stopPropagation();
+        panelOpen ? closePanel() : openPanel();
+    });
+
+    document.addEventListener('click', function (e) {
+        if (panelOpen && !panel.contains(e.target) && e.target !== bell) {
+            closePanel();
+        }
+    });
+
+    markAllBtn.addEventListener('click', function (e) {
+        e.preventDefault();
+        fetch('/notifications/mark-read/', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: { 'X-CSRFToken': csrfToken() }
+        }).then(() => {
+            loaded = false;
+            loadNotifications();
+            notifBadge.style.display = 'none';
+        });
+    });
+
+    // Clicking a notification item also marks read
+    notifList.addEventListener('click', function (e) {
+        const item = e.target.closest('.notif-item');
+        if (item) {
+            fetch('/notifications/mark-read/', {
+                method: 'POST',
+                credentials: 'same-origin',
+                headers: { 'X-CSRFToken': csrfToken() }
+            });
+            notifBadge.style.display = 'none';
+        }
+    });
 });
 </script>
