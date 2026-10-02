@@ -1,39 +1,72 @@
 {% extends 'base.html' %}
 {% block title %}Manage Groups | Admin Dashboard{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-shield-lock"></i> Groups</h2>
-    <a href="{% url 'group_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add New Group</a>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-shield-lock text-primary me-2"></i>Groups</h2>
+        <p class="text-muted mb-0">Manage roles and access permissions.</p>
+    </div>
+    <a href="{% url 'group_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold mt-2 mt-md-0"><i class="bi bi-plus-lg me-2"></i>Add New Group</a>
 </div>
 
-<div class="card shadow-sm border-0">
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <form method="GET" class="d-flex w-100 gap-2">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control border-start-0 ps-0" placeholder="Search groups by name...">
+                {% if request.GET.q %}
+                <a href="?" class="btn border border-start-0 bg-white text-muted"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary px-4">Search</button>
+        </form>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
                     <tr>
-                        <th>Group Name</th>
+                        <th class="ps-4">Group Name</th>
                         <th>Permissions</th>
                         <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for group in groups %}
+                    {% for group in page_obj %}
                     <tr>
-                        <td class="fw-bold">
+                        <td class="ps-4 fw-bold">
                             <a href="{% url 'group_update' group.pk %}" class="text-decoration-none">{{ group.name }}</a>
                         </td>
-                        <td>{{ group.permissions.count }} permissions</td>
+                        <td>
+                            {% with perms=group.permissions.all %}
+                                {{ perms|length }} permission{{ perms|length|pluralize }}
+                                {% if perms|length > 0 %}
+                                    <div class="mt-1">
+                                        {% for p in perms|slice:":2" %}
+                                            <span class="badge bg-light text-dark border fw-normal me-1">{{ p.name }}</span>
+                                        {% endfor %}
+                                        {% if perms|length > 2 %}
+                                            <span class="badge bg-light text-dark border fw-normal text-muted">+{{ perms|length|add:"-2" }} more</span>
+                                        {% endif %}
+                                    </div>
+                                {% endif %}
+                            {% endwith %}
+                        </td>
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
-                                <a href="{% url 'group_update' group.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'group_delete' group.pk %}" data-message="Are you sure you want to delete group '{{ group.name }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                <a href="{% url 'group_update' group.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Group" aria-label="Edit Group"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'group_delete' group.pk %}" data-message="Are you sure you want to permanently delete group '{{ group.name }}'?" data-title="Delete Group" aria-label="Delete Group" title="Delete Group"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="3" class="text-center py-4 text-muted">No groups found.</td>
+                        <td colspan="3" class="text-center py-5 text-muted">
+                            <i class="bi bi-shield-lock text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <p class="mb-3">No groups found.</p>
+                            <a href="{% url 'group_create' %}" class="btn btn-sm btn-primary">Add your first group</a>
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -41,4 +74,7 @@
         </div>
     </div>
 </div>
+
+{% include 'includes/pagination.html' %}
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

@@ -213,7 +213,7 @@ body {
     justify-content: space-between;
 }
 .content-area {
-    padding: 20px;
+    padding: 24px 32px;
 }
 
 @media (max-width: 767.98px) {
@@ -274,4 +274,43 @@ form input:focus, form select:focus, form textarea:focus {
 }
 [data-theme="dark"] .btn-white:hover {
     border-color: #475569;
+}
+
+/* Custom Table Styles */
+.table-custom {
+    margin-bottom: 0;
+    color: var(--text-main);
+}
+.table-custom th {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-weight: 600;
+    color: var(--text-muted);
+    background-color: var(--bg-color);
+    border-bottom: 1px solid var(--border);
+    padding-top: 12px;
+    padding-bottom: 12px;
+    white-space: nowrap;
+}
+.table-custom td {
+    font-size: 15px;
+    vertical-align: middle;
+    border-bottom: 1px solid var(--border);
+    color: var(--text-main);
+    background-color: var(--surface);
+}
+.table-custom tbody tr:hover td {
+    background-color: var(--bg-color);
+}
+[data-theme="dark"] .table-custom th {
+    background-color: #0f172a;
+    border-color: var(--border);
+}
+[data-theme="dark"] .table-custom td {
+    background-color: var(--surface);
+    border-color: var(--border);
+}
+[data-theme="dark"] .table-custom tbody tr:hover td {
+    background-color: #334155;
 }

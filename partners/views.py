@@ -3,6 +3,8 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
+from django.db.models import Q
+from django.core.paginator import Paginator
 from .models import PartnerProfile
 from .forms import UserForm, GroupForm, PartnerProfileForm
 
@@ -12,8 +14,21 @@ def partner_list(request):
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
         
-    partners = PartnerProfile.objects.all().order_by('-created_at')
-    return render(request, 'partners/partner_list.html', {'partners': partners})
+    query = request.GET.get('q', '')
+    partners_qs = PartnerProfile.objects.select_related('user').all().order_by('-created_at')
+    
+    if query:
+        partners_qs = partners_qs.filter(
+            Q(company_name__icontains=query) |
+            Q(user__username__icontains=query) |
+            Q(user__email__icontains=query)
+        )
+        
+    paginator = Paginator(partners_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'partners/partner_list.html', {'page_obj': page_obj})
 
 @login_required(login_url='/login/')
 @require_POST
@@ -56,8 +71,22 @@ def user_list(request):
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
         
-    users = User.objects.filter(is_active=True).order_by('-date_joined')
-    return render(request, 'partners/user_list.html', {'users': users})
+    query = request.GET.get('q', '')
+    users_qs = User.objects.filter(is_active=True).prefetch_related('groups').order_by('-date_joined')
+    
+    if query:
+        users_qs = users_qs.filter(
+            Q(username__icontains=query) |
+            Q(email__icontains=query) |
+            Q(first_name__icontains=query) |
+            Q(last_name__icontains=query)
+        )
+        
+    paginator = Paginator(users_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'partners/user_list.html', {'page_obj': page_obj})
 
 @login_required(login_url='/login/')
 def user_create(request):
@@ -81,8 +110,17 @@ def group_list(request):
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
         
-    groups = Group.objects.all()
-    return render(request, 'partners/group_list.html', {'groups': groups})
+    query = request.GET.get('q', '')
+    groups_qs = Group.objects.prefetch_related('permissions').all().order_by('name')
+    
+    if query:
+        groups_qs = groups_qs.filter(name__icontains=query)
+        
+    paginator = Paginator(groups_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'partners/group_list.html', {'page_obj': page_obj})
 
 @login_required(login_url='/login/')
 def group_create(request):

@@ -1,0 +1,47 @@
+<!-- Reusable Confirmation Modal -->
+<div class="modal fade" id="confirmModal" tabindex="-1" aria-labelledby="confirmModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content border-0 shadow">
+            <div class="modal-header border-bottom-0 pb-0">
+                <h5 class="modal-title fw-bold" id="confirmModalLabel">Confirm Action</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+            </div>
+            <div class="modal-body pt-3 pb-4">
+                <p id="confirmModalMessage" class="mb-0">Are you sure you want to proceed?</p>
+            </div>
+            <div class="modal-footer border-top-0 pt-0">
+                <button type="button" class="btn btn-light shadow-sm" data-bs-dismiss="modal">Cancel</button>
+                <form id="confirmModalForm" method="POST" action="">
+                    {% csrf_token %}
+                    <button type="submit" class="btn btn-danger shadow-sm" id="confirmModalSubmitBtn">Yes, Proceed</button>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    var confirmModal = document.getElementById('confirmModal');
+    if (confirmModal) {
+        confirmModal.addEventListener('show.bs.modal', function (event) {
+            var button = event.relatedTarget;
+            var actionUrl = button.getAttribute('data-action-url');
+            var message = button.getAttribute('data-message') || 'Are you sure you want to proceed?';
+            var submitText = button.getAttribute('data-submit-text') || 'Yes, Proceed';
+            var btnClass = button.getAttribute('data-submit-class') || 'btn-danger';
+            
+            var modalTitle = confirmModal.querySelector('.modal-title');
+            var modalMessage = confirmModal.querySelector('#confirmModalMessage');
+            var form = confirmModal.querySelector('#confirmModalForm');
+            var submitBtn = confirmModal.querySelector('#confirmModalSubmitBtn');
+            
+            modalTitle.textContent = button.getAttribute('data-title') || 'Confirm Action';
+            modalMessage.textContent = message;
+            form.action = actionUrl;
+            submitBtn.textContent = submitText;
+            submitBtn.className = 'btn shadow-sm ' + btnClass;
+        });
+    }
+});
+</script>

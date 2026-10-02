@@ -3,70 +3,83 @@
 {% block title %}My Profile | Partner Portal{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-person-badge text-primary me-2"></i> My Profile</h2>
-    <div class="d-flex gap-2">
-        <a href="{% url 'password_change' %}" class="btn btn-outline-secondary"><i class="bi bi-key-fill"></i> Change Password</a>
-        <a href="{% url 'profile_edit' %}" class="btn btn-primary"><i class="bi bi-pencil-square"></i> Edit Profile</a>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-person-badge-fill text-primary me-2"></i>My Profile</h2>
+        <p class="text-muted mb-0">Manage your account settings and preferences.</p>
+    </div>
+    <div class="d-flex gap-2 mt-2 mt-md-0">
+        <a href="{% url 'password_change' %}" class="btn btn-white text-dark shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-key-fill me-2"></i>Change Password</a>
+        <a href="{% url 'profile_edit' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-pencil-square me-2"></i>Edit Profile</a>
     </div>
 </div>
 
-<div class="row">
-    <div class="col-md-8 col-lg-6">
-        <div class="card shadow-sm border-0 rounded-4 overflow-hidden">
-            <div class="card-header bg-primary bg-gradient text-white py-4 text-center border-0">
-                <div class="user-avatar bg-white text-primary mx-auto mb-3 shadow" style="width: 80px; height: 80px; font-size: 2.5rem;">
-                    {{ user.username|make_list|first|upper }}
-                </div>
-                <h4 class="mb-1 fw-bold">{{ profile.company_name|default:"System Administrator" }}</h4>
-                <p class="mb-0 text-white-50">{{ user.email|default:"No email provided" }}</p>
+<div class="card shadow-sm border-0 rounded-4 overflow-hidden mb-4">
+    <div class="row g-0">
+        <div class="col-md-4 col-lg-3 bg-primary bg-gradient text-white p-5 d-flex flex-column align-items-center justify-content-center text-center">
+            <div class="user-avatar bg-white text-primary rounded-circle d-flex align-items-center justify-content-center mb-4 shadow-lg mx-auto" style="width: 120px; height: 120px; font-size: 3.5rem; font-weight: bold;">
+                {{ user.username|make_list|first|upper }}
             </div>
-            <div class="card-body p-4">
-                {% if profile %}
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
-                        <span class="text-muted"><i class="bi bi-person me-2"></i> Username</span>
-                        <span class="fw-semibold text-dark">{{ user.username }}</span>
-                    </li>
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
-                        <span class="text-muted"><i class="bi bi-telephone me-2"></i> Phone</span>
-                        <span class="fw-semibold text-dark">{{ profile.phone_number }}</span>
-                    </li>
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
-                        <span class="text-muted"><i class="bi bi-geo-alt me-2"></i> Address</span>
-                        <span class="fw-semibold text-dark text-end">{{ profile.address|default:"Not Provided" }}</span>
-                    </li>
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center">
-                        <span class="text-muted"><i class="bi bi-shield-check me-2"></i> Status</span>
-                        <span>
-                            {% if profile.is_approved %}
-                            <span class="badge bg-success rounded-pill px-3 py-2">Approved</span>
-                            {% else %}
-                            <span class="badge bg-warning text-dark rounded-pill px-3 py-2">Pending Approval</span>
-                            {% endif %}
-                        </span>
-                    </li>
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                        <span class="text-muted"><i class="bi bi-calendar3 me-2"></i> Member Since</span>
-                        <span class="fw-semibold text-dark">{{ profile.created_at|date:"F j, Y" }}</span>
-                    </li>
-                </ul>
-                {% elif user.is_staff %}
-                <div class="alert alert-info border-0 shadow-sm rounded mb-4">
-                    <i class="bi bi-info-circle-fill me-2"></i> You are logged in as a System Administrator.
-                </div>
-                <ul class="list-group list-group-flush">
-                    <li class="list-group-item px-0 py-3 d-flex justify-content-between align-items-center border-bottom-0">
-                        <span class="text-muted"><i class="bi bi-shield-lock me-2"></i> Role</span>
-                        <span class="badge bg-primary rounded-pill px-3 py-2">Master Admin</span>
-                    </li>
-                </ul>
-                {% else %}
-                <div class="alert alert-warning border-0 shadow-sm rounded mb-0">
-                    <i class="bi bi-exclamation-triangle-fill me-2"></i> Your partner profile is not completely set up yet. Please contact the administrator.
-                </div>
-                {% endif %}
+            <h4 class="mb-2 fw-bold text-white">{{ profile.company_name|default:"System Administrator" }}</h4>
+            <div class="d-flex align-items-center justify-content-center px-3 py-2 bg-white bg-opacity-25 rounded-pill mt-2">
+                <i class="bi bi-envelope-fill me-2"></i>
+                <span class="text-white fw-medium" style="opacity: 0.95;">{{ user.email|default:"No email provided" }}</span>
             </div>
+        </div>
+        <div class="col-md-8 col-lg-9 p-4 p-md-5">
+            <h5 class="fw-bold text-dark mb-4 pb-2 border-bottom">Account Details</h5>
+            {% if profile %}
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-person me-1"></i> Username</label>
+                    <div class="fw-bold text-dark fs-5">{{ user.username }}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-telephone me-1"></i> Phone</label>
+                    <div class="fw-bold text-dark fs-5">{{ profile.phone_number }}</div>
+                </div>
+                <div class="col-md-12">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-geo-alt me-1"></i> Address</label>
+                    <div class="fw-bold text-dark fs-5">{{ profile.address|default:"Not Provided" }}</div>
+                </div>
+                <div class="col-md-6">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-shield-check me-1"></i> Status</label>
+                    <div>
+                        {% if profile.is_approved %}
+                        <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-3 py-2"><i class="bi bi-check-circle me-1"></i>Approved</span>
+                        {% else %}
+                        <span class="badge bg-warning bg-opacity-10 text-warning border border-warning border-opacity-25 rounded-pill px-3 py-2"><i class="bi bi-clock me-1"></i>Pending Approval</span>
+                        {% endif %}
+                    </div>
+                </div>
+                <div class="col-md-6">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-calendar3 me-1"></i> Member Since</label>
+                    <div class="fw-bold text-dark fs-5">{{ profile.created_at|date:"F j, Y" }}</div>
+                </div>
+            </div>
+            {% elif user.is_staff %}
+            <div class="alert alert-info border-0 shadow-sm rounded-3 mb-4 d-flex align-items-center">
+                <i class="bi bi-info-circle-fill fs-4 me-3 text-info"></i> 
+                <div>
+                    <strong>System Administrator</strong><br>
+                    You are logged in with master administrative privileges.
+                </div>
+            </div>
+            <div class="row g-4">
+                <div class="col-md-6">
+                    <label class="text-muted small fw-semibold text-uppercase letter-spacing-1 mb-1"><i class="bi bi-shield-lock me-1"></i> Role</label>
+                    <div><span class="badge bg-primary bg-gradient rounded-pill px-3 py-2"><i class="bi bi-star-fill me-1"></i>Master Admin</span></div>
+                </div>
+            </div>
+            {% else %}
+            <div class="alert alert-warning border-0 shadow-sm rounded-3 mb-0 d-flex align-items-center">
+                <i class="bi bi-exclamation-triangle-fill fs-4 me-3 text-warning"></i>
+                <div>
+                    <strong>Profile Incomplete</strong><br>
+                    Your partner profile is not completely set up yet. Please contact the administrator.
+                </div>
+            </div>
+            {% endif %}
         </div>
     </div>
 </div>

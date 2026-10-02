@@ -4,8 +4,11 @@
 {% block title %}Recycle Bin | Admin Dashboard{% endblock %}
 
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-trash text-danger me-2"></i> Recycle Bin</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="fw-bold mb-1"><i class="bi bi-trash3-fill text-danger me-2"></i>Recycle Bin</h2>
+        <p class="text-muted mb-0">Recover deleted items or permanently remove them.</p>
+    </div>
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
@@ -13,8 +16,8 @@
         <ul class="nav nav-tabs border-bottom-0" id="recycleBinTabs">
             {% for key, tab_data in tabs.items %}
             <li class="nav-item">
-                <a class="nav-link {% if active_tab == key %}active fw-bold text-danger border-bottom border-danger border-3{% else %}text-muted{% endif %}" 
-                   href="?tab={{ key }}">
+                <a class="nav-link {% if active_tab == key %}active fw-bold text-primary border-bottom border-primary border-3{% else %}text-muted{% endif %}" 
+                   href="?tab={{ key }}" style="background: transparent; border-top: 0; border-left: 0; border-right: 0;">
                     {{ tab_data.verbose_name }}
                     {% if tab_data.count > 0 %}
                     <span class="badge rounded-pill bg-secondary ms-1">{{ tab_data.count }}</span>
@@ -27,15 +30,15 @@
     
     <div class="card-body p-0">
         {% if tabs|get_item:active_tab|get_item:'count' > 0 %}
-        <div class="d-flex justify-content-end p-3 border-bottom bg-light">
-            <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#emptyBinModal">
+        <div class="d-flex justify-content-end p-3 border-bottom">
+            <button type="button" class="btn btn-sm btn-outline-danger shadow-sm" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'empty_bin' active_tab %}" data-message="Are you sure you want to permanently delete all items in the {{ tabs|get_item:active_tab|get_item:'verbose_name' }} bin? This action cannot be undone." data-title="Empty Bin" aria-label="Empty Bin" title="Empty Bin">
                 <i class="bi bi-trash3"></i> Empty {{ tabs|get_item:active_tab|get_item:'verbose_name' }} Bin
             </button>
         </div>
         
         <div class="table-responsive">
-            <table class="table table-hover mb-0">
-                <thead class="table-light">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
                     <tr>
                         <th class="ps-4">Item</th>
                         <th>Deleted On</th>
@@ -53,32 +56,9 @@
                             <div class="d-flex gap-2 justify-content-end align-items-center">
                                 <form action="{% url 'restore_item' active_tab item.pk %}" method="post" class="mb-0">
                                     {% csrf_token %}
-                                    <button type="submit" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
+                                    <button type="submit" class="btn btn-sm btn-white text-success" data-bs-toggle="tooltip" title="Restore" aria-label="Restore"><i class="bi bi-arrow-counterclockwise"></i></button>
                                 </form>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#hardDeleteModal{{ item.pk }}" title="Delete Forever"><i class="bi bi-trash"></i></button>
-                            </div>
-                            
-                            <!-- Hard Delete Modal for this item -->
-                            <div class="modal fade text-start" id="hardDeleteModal{{ item.pk }}" tabindex="-1" aria-hidden="true">
-                                <div class="modal-dialog modal-dialog-centered">
-                                    <div class="modal-content">
-                                        <div class="modal-header border-0 pb-0">
-                                            <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> Delete Forever</h5>
-                                            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-                                        </div>
-                                        <div class="modal-body pt-3 pb-4">
-                                            Are you sure you want to permanently delete '{{ item }}'?<br>
-                                            <strong>This action cannot be undone.</strong>
-                                        </div>
-                                        <div class="modal-footer border-0 pt-0">
-                                            <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                                            <form action="{% url 'hard_delete_item' active_tab item.pk %}" method="post">
-                                                {% csrf_token %}
-                                                <button type="submit" class="btn btn-danger">Delete Forever</button>
-                                            </form>
-                                        </div>
-                                    </div>
-                                </div>
+                                <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'hard_delete_item' active_tab item.pk %}" data-message="Are you sure you want to permanently delete '{{ item }}'? This action cannot be undone." data-title="Delete Forever" aria-label="Delete Forever" title="Delete Forever"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -87,39 +67,14 @@
             </table>
         </div>
         {% else %}
-        <div class="text-center py-5">
-            <div class="d-flex flex-column align-items-center">
-                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                    <i class="bi bi-trash2 text-muted fs-1"></i>
-                </div>
-                <h5 class="fw-bold text-dark">Recycle Bin is Empty</h5>
-                <p class="text-muted mb-0">No deleted {{ tabs|get_item:active_tab|get_item:'verbose_name'|lower }} found.</p>
-            </div>
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-trash2 text-light mb-3" style="font-size: 3rem; display: block;"></i>
+            <h5 class="fw-bold text-dark">Recycle Bin is Empty</h5>
+            <p class="mb-0">No deleted {{ tabs|get_item:active_tab|get_item:'verbose_name'|lower }} found.</p>
         </div>
         {% endif %}
     </div>
 </div>
 
-<!-- Empty Bin Modal -->
-<div class="modal fade" id="emptyBinModal" tabindex="-1" aria-hidden="true">
-    <div class="modal-dialog modal-dialog-centered">
-        <div class="modal-content">
-            <div class="modal-header border-0 pb-0">
-                <h5 class="modal-title text-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> Empty Bin</h5>
-                <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-            </div>
-            <div class="modal-body pt-3 pb-4">
-                Are you sure you want to permanently delete all items in the {{ tabs|get_item:active_tab|get_item:'verbose_name' }} bin?<br>
-                <strong>This action cannot be undone.</strong>
-            </div>
-            <div class="modal-footer border-0 pt-0">
-                <button type="button" class="btn btn-light" data-bs-dismiss="modal">Cancel</button>
-                <form action="{% url 'empty_bin' active_tab %}" method="post">
-                    {% csrf_token %}
-                    <button type="submit" class="btn btn-danger">Empty Bin</button>
-                </form>
-            </div>
-        </div>
-    </div>
-</div>
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

@@ -2,27 +2,32 @@
 
 {% block title %}Manage Partners | Admin Dashboard{% endblock %}
 
-{% block extra_css %}
-<style>
-.table-scroll-container { max-height: 60vh; overflow-y: auto; overflow-x: auto; }
-.table-scroll-container thead th { position: sticky; top: 0; background-color: #f8f9fa; z-index: 1; box-shadow: 0 1px 0 rgba(0,0,0,0.1); }
-.partner-table { font-size: 0.9rem; }
-.partner-table td { vertical-align: middle; }
-.truncate-cell { max-width: 150px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.actions-column { min-width: 140px; white-space: nowrap; }
-</style>
-{% endblock %}
-
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-people-fill text-primary me-2"></i> Manage Partners</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-buildings-fill text-primary me-2"></i>Partner Profiles</h2>
+        <p class="text-muted mb-0">Manage registered affiliates and organizations.</p>
+    </div>
+    <a href="{% url 'partner_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold mt-2 mt-md-0"><i class="bi bi-building-add me-2"></i>Add New Partner</a>
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <form method="GET" class="d-flex w-100 gap-2">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control border-start-0 ps-0" placeholder="Search partners by company, username or email...">
+                {% if request.GET.q %}
+                <a href="?" class="btn border border-start-0 bg-white text-muted"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary px-4">Search</button>
+        </form>
+    </div>
     <div class="card-body p-0">
-        <div class="table-responsive table-scroll-container">
-            <table class="table table-hover mb-0 partner-table">
-                <thead class="table-light">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0">
+                <thead>
                     <tr>
                         <th class="ps-4">Company Name</th>
                         <th>Username</th>
@@ -30,18 +35,18 @@
                         <th>Phone</th>
                         <th>Status</th>
                         <th>Registered</th>
-                        <th class="text-end pe-4 actions-column">Action</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for partner in partners %}
+                    {% for partner in page_obj %}
                     <tr>
-                        <td class="fw-bold ps-4">
+                        <td class="ps-4 fw-bold">
                             <a href="{% url 'partner_update' partner.pk %}" class="text-decoration-none">{{ partner.company_name }}</a>
                         </td>
                         <td>{{ partner.user.username }}</td>
-                        <td class="truncate-cell" title="{{ partner.user.email }}">{{ partner.user.email }}</td>
-                        <td class="truncate-cell" title="{{ partner.phone_number }}">{{ partner.phone_number }}</td>
+                        <td>{{ partner.user.email }}</td>
+                        <td style="white-space: nowrap;">{{ partner.phone_number }}</td>
                         <td>
                             {% if partner.is_approved %}
                                 <span class="badge rounded-pill bg-success px-3 py-2">Approved</span>
@@ -55,25 +60,20 @@
                                 <form action="{% url 'partner_approve' partner.id %}" method="post" class="mb-0">
                                     {% csrf_token %}
                                     <input type="hidden" name="is_approved" value="{% if partner.is_approved %}false{% else %}true{% endif %}">
-                                    <button type="submit" class="btn btn-sm {% if partner.is_approved %}btn-outline-warning{% else %}btn-outline-success{% endif %}" data-bs-toggle="tooltip" title="{% if partner.is_approved %}Revoke Approval{% else %}Approve Partner{% endif %}">
+                                    <button type="submit" class="btn btn-sm btn-white {% if partner.is_approved %}text-warning{% else %}text-success{% endif %}" data-bs-toggle="tooltip" title="{% if partner.is_approved %}Suspend or Reject{% else %}Approve Partner{% endif %}" aria-label="{% if partner.is_approved %}Suspend or Reject{% else %}Approve Partner{% endif %}">
                                         {% if partner.is_approved %}<i class="bi bi-x-circle"></i>{% else %}<i class="bi bi-check-circle"></i>{% endif %}
                                     </button>
                                 </form>
-                                <a href="{% url 'partner_update' partner.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'partner_delete' partner.pk %}" data-message="Are you sure you want to delete partner '{{ partner.company_name }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                <a href="{% url 'partner_update' partner.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Partner" aria-label="Edit Partner"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'partner_delete' partner.pk %}" data-message="Are you sure you want to move partner '{{ partner.company_name }}' to the Recycle Bin?" data-title="Delete Partner" aria-label="Delete Partner" title="Delete Partner"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="7" class="text-center py-5">
-                            <div class="d-flex flex-column align-items-center">
-                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                                    <i class="bi bi-people text-muted fs-1"></i>
-                                </div>
-                                <h5 class="fw-bold text-dark">No Partners Found</h5>
-                                <p class="text-muted mb-4">There are no partners registered yet.</p>
-                            </div>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-buildings text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <p class="mb-3">No partners found.</p>
                         </td>
                     </tr>
                     {% endfor %}
@@ -82,4 +82,7 @@
         </div>
     </div>
 </div>
+
+{% include 'includes/pagination.html' %}
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

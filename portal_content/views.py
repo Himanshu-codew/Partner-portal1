@@ -5,6 +5,7 @@ from django.contrib import messages
 from .models import Announcement, Document
 from .forms import AnnouncementForm, DocumentForm
 from django.db.models import Q
+from django.core.paginator import Paginator
 
 def _get_partner_profile(user):
     """Helper to safely get partner profile."""
@@ -82,15 +83,54 @@ def document_create(request):
 @login_required(login_url='/login/')
 def announcement_list(request):
     if request.user.is_staff:
-        announcements = Announcement.objects.all().order_by('-created_at')
+        announcements_qs = Announcement.objects.all().prefetch_related('visible_to').order_by('-created_at')
     else:
-        announcements = Announcement.objects.filter(is_active=True).order_by('-created_at')
-    return render(request, 'portal_content/announcement_list.html', {'announcements': announcements})
+        profile = _get_partner_profile(request.user)
+        if profile:
+            from django.db.models import Count
+            announcements_qs = Announcement.objects.filter(is_active=True).annotate(
+                vcount=Count('visible_to')
+            ).filter(
+                Q(vcount=0) | Q(visible_to=profile)
+            ).distinct().order_by('-created_at')
+        else:
+            announcements_qs = Announcement.objects.none()
+
+    query = request.GET.get('q', '')
+    if query:
+        announcements_qs = announcements_qs.filter(title__icontains=query)
+
+    paginator = Paginator(announcements_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'portal_content/announcement_list.html', {'page_obj': page_obj})
 
 @login_required(login_url='/login/')
 def document_list(request):
-    documents = Document.objects.all().order_by('-uploaded_at')
-    return render(request, 'portal_content/document_list.html', {'documents': documents})
+    if request.user.is_staff:
+        documents_qs = Document.objects.all().prefetch_related('visible_to').order_by('-uploaded_at')
+    else:
+        profile = _get_partner_profile(request.user)
+        if profile:
+            from django.db.models import Count
+            documents_qs = Document.objects.annotate(
+                vcount=Count('visible_to')
+            ).filter(
+                Q(vcount=0) | Q(visible_to=profile)
+            ).distinct().order_by('-uploaded_at')
+        else:
+            documents_qs = Document.objects.none()
+            
+    query = request.GET.get('q', '')
+    if query:
+        documents_qs = documents_qs.filter(title__icontains=query)
+
+    paginator = Paginator(documents_qs, 10)
+    page_number = request.GET.get('page')
+    page_obj = paginator.get_page(page_number)
+    
+    return render(request, 'portal_content/document_list.html', {'page_obj': page_obj})
 
 @login_required(login_url='/login/')
 def announcement_update(request, pk):

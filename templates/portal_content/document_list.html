@@ -1,49 +1,94 @@
 {% extends 'base.html' %}
 {% block title %}Documents | Partner Portal{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-folder"></i> Documents</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-file-earmark-text-fill text-primary me-2"></i>Documents</h2>
+        <p class="text-muted mb-0">Resource center for marketing and sales materials.</p>
+    </div>
     {% if request.user.is_staff %}
-    <a href="{% url 'document_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add Document</a>
+    <a href="{% url 'document_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold mt-2 mt-md-0"><i class="bi bi-plus-lg me-2"></i>Add Document</a>
     {% endif %}
 </div>
 
-<div class="card shadow-sm border-0">
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <form method="GET" class="d-flex w-100 gap-2">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control border-start-0 ps-0" placeholder="Search documents by title...">
+                {% if request.GET.q %}
+                <a href="?" class="btn border border-start-0 bg-white text-muted"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary px-4">Search</button>
+        </form>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
+            <table class="table table-custom table-hover mb-0 align-middle">
+                <thead>
                     <tr>
-                        <th>Document Title</th>
-                        <th>File</th>
-                        <th>Uploaded At</th>
+                        <th class="ps-4">Document Title</th>
                         {% if request.user.is_staff %}
-                        <th class="text-end pe-4">Actions</th>
+                        <th>Audience</th>
                         {% endif %}
+                        <th>File Info</th>
+                        <th>Uploaded At</th>
+                        <th class="text-end pe-4">Actions</th>
                     </tr>
                 </thead>
                 <tbody>
-                    {% for doc in documents %}
+                    {% for doc in page_obj %}
                     <tr>
-                        <td class="fw-bold">{{ doc.title }}</td>
-                        <td>
-                            <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-                                <i class="bi bi-download"></i> Download
-                            </a>
-                        </td>
-                        <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
+                        <td class="ps-4 fw-bold text-primary">{{ doc.title }}</td>
                         {% if request.user.is_staff %}
-                        <td class="text-end pe-4">
-                            <div class="d-flex gap-2 justify-content-end align-items-center">
-                                <a href="{% url 'document_update' doc.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'document_delete' doc.pk %}" data-message="Are you sure you want to delete document '{{ doc.title }}'?" title="Delete"><i class="bi bi-trash"></i></button>
-                            </div>
+                        <td>
+                            {% if doc.visible_to.exists %}
+                                <span class="badge bg-info">Selected partners ({{ doc.visible_to.count }})</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Public</span>
+                            {% endif %}
                         </td>
                         {% endif %}
+                        <td>
+                            {% with ext=doc.file.name|slice:"-4:"|lower %}
+                            <div class="d-flex align-items-center text-muted small">
+                                {% if '.pdf' in ext %}
+                                <i class="bi bi-file-earmark-pdf fs-4 text-danger me-2"></i>
+                                {% elif '.doc' in ext or '.docx' in ext %}
+                                <i class="bi bi-file-earmark-word fs-4 text-primary me-2"></i>
+                                {% elif '.xls' in ext or '.xlsx' in ext %}
+                                <i class="bi bi-file-earmark-excel fs-4 text-success me-2"></i>
+                                {% elif '.png' in ext or '.jpg' in ext or '.jpeg' in ext %}
+                                <i class="bi bi-file-earmark-image fs-4 text-info me-2"></i>
+                                {% else %}
+                                <i class="bi bi-file-earmark fs-4 text-secondary me-2"></i>
+                                {% endif %}
+                                {{ doc.file.size|filesizeformat }}
+                            </div>
+                            {% endwith %}
+                        </td>
+                        <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
+                        <td class="text-end pe-4">
+                            <div class="d-flex gap-2 justify-content-end align-items-center">
+                                <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-white text-dark" data-bs-toggle="tooltip" title="Download" aria-label="Download Document"><i class="bi bi-download"></i></a>
+                                {% if request.user.is_staff %}
+                                <a href="{% url 'document_update' doc.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Document" aria-label="Edit Document"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'document_delete' doc.pk %}" data-message="Are you sure you want to move document '{{ doc.title }}' to the Recycle Bin?" data-title="Delete Document" aria-label="Delete Document" title="Delete Document"><i class="bi bi-trash"></i></button>
+                                {% endif %}
+                            </div>
+                        </td>
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">No documents available.</td>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="bi bi-folder2-open text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <p class="mb-3">No documents available.</p>
+                            {% if request.user.is_staff %}
+                            <a href="{% url 'document_create' %}" class="btn btn-sm btn-primary">Upload your first document</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -51,4 +96,7 @@
         </div>
     </div>
 </div>
+
+{% include 'includes/pagination.html' %}
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

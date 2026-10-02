@@ -3,53 +3,49 @@
 
 {% block title %}Orders | Partner Portal{% endblock %}
 
-{% block extra_css %}
-<style>
-.table-scroll-container { max-height: 60vh; overflow-y: auto; }
-.table-scroll-container thead th { position: sticky; top: 0; background-color: #f8f9fa; z-index: 1; box-shadow: 0 1px 0 rgba(0,0,0,0.1); }
-</style>
-{% endblock %}
-
 {% block content %}
 <div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
     <div>
-        <h2 class="fw-bold mb-1"><i class="bi bi-cart-check text-success me-2"></i>Orders</h2>
+        <h2 class="fw-bold mb-1"><i class="bi bi-cart-check-fill text-primary me-2"></i>Orders</h2>
         <p class="text-muted mb-0">Manage tracking and commissions for your orders.</p>
     </div>
     <div class="mt-2 mt-md-0">
         {% if request.user.is_staff and perms.orders.add_order %}
-        <a href="{% url 'order_create' %}" class="btn btn-success shadow-sm"><i class="bi bi-plus-circle me-1"></i> Add Order</a>
+        <a href="{% url 'order_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-plus-lg me-2"></i>Add Order</a>
         {% endif %}
     </div>
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
-    <div class="card-header bg-white border-bottom py-3">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
         <form method="get" class="row g-2 align-items-center">
-            <div class="col-md-5">
+            <div class="col-md-6 col-lg-7">
                 <div class="input-group">
-                    <span class="input-group-text bg-white text-muted border-end-0"><i class="bi bi-search"></i></span>
+                    <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
                     <input type="text" name="q" class="form-control border-start-0 ps-0" placeholder="Search order number or partner..." value="{{ search_query }}">
+                    {% if search_query or status_filter %}
+                    <a href="?" class="btn border border-start-0 bg-white text-muted"><i class="bi bi-x-lg"></i></a>
+                    {% endif %}
                 </div>
             </div>
-            <div class="col-md-4">
+            <div class="col-md-4 col-lg-3">
                 <select name="status" class="form-select">
-                    <option value="">All Status</option>
+                    <option value="">All Statuses</option>
                     {% for key, val in statuses.items %}
                     <option value="{{ key }}" {% if status_filter == key %}selected{% endif %}>{{ val }}</option>
                     {% endfor %}
                 </select>
             </div>
-            <div class="col-md-3">
-                <button type="submit" class="btn btn-secondary w-100">Filter</button>
+            <div class="col-md-2 col-lg-2">
+                <button type="submit" class="btn btn-primary w-100">Filter</button>
             </div>
         </form>
     </div>
     
     <div class="card-body p-0">
-        <div class="table-responsive table-scroll-container">
-            <table class="table table-hover align-middle mb-0">
-                <thead class="table-light">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover align-middle mb-0">
+                <thead>
                     <tr>
                         <th class="ps-4">Order Details</th>
                         <th>Partner</th>
@@ -61,7 +57,7 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for order in orders %}
+                    {% for order in page_obj %}
                     <tr>
                         <td class="ps-4">
                             <div class="fw-bold text-dark">#{{ order.order_number }}</div>
@@ -70,9 +66,9 @@
                             <div class="fw-semibold text-dark">{{ order.partner.company_name }}</div>
                             <small class="text-muted">{{ order.partner.user.username }}</small>
                         </td>
-                        <td>₹ {{ order.amount|floatformat:2|intcomma }}</td>
+                        <td>₹{{ order.amount|floatformat:2|intcomma }}</td>
                         <td>
-                            <div>₹ {{ order.commission_amount|floatformat:2|intcomma }}</div>
+                            <div>₹{{ order.commission_amount|floatformat:2|intcomma }}</div>
                             {% if order.is_commission_paid %}
                             <span class="badge bg-success bg-opacity-10 text-success border border-success border-opacity-25 rounded-pill px-2 py-1 small"><i class="bi bi-check-circle me-1"></i>Paid</span>
                             {% else %}
@@ -80,22 +76,25 @@
                             {% endif %}
                         </td>
                         <td>
-                            {% include 'includes/status_badge.html' with status=order.status label=order.get_status_display %}
+                            {% if request.user.is_staff %}
+                                <form action="{% url 'order_update_status' order.id %}" method="post" class="mb-0">
+                                    {% csrf_token %}
+                                    <select name="status" class="form-select form-select-sm shadow-sm" onchange="this.form.submit()" style="width: 140px; border-radius: 20px; font-size: 0.85rem;">
+                                        {% for key, val in statuses.items %}
+                                        <option value="{{ key }}" {% if order.status == key %}selected{% endif %}>{{ val }}</option>
+                                        {% endfor %}
+                                    </select>
+                                </form>
+                            {% else %}
+                                {% include 'includes/status_badge.html' with status=order.status label=order.get_status_display %}
+                            {% endif %}
                         </td>
                         <td>{{ order.created_at|date:"M d, Y" }}</td>
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
                                 {% if request.user.is_staff %}
-                                    <form action="{% url 'order_update_status' order.id %}" method="post" class="mb-0">
-                                        {% csrf_token %}
-                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()" style="width: auto;">
-                                            {% for key, val in statuses.items %}
-                                            <option value="{{ key }}" {% if order.status == key %}selected{% endif %}>{{ val }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </form>
-                                    <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'order_delete' order.pk %}" data-message="Are you sure you want to delete order '#{{ order.order_number }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                    <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Order" aria-label="Edit Order"><i class="bi bi-pencil"></i></a>
+                                    <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'order_delete' order.pk %}" data-message="Are you sure you want to move order '#{{ order.order_number }}' to the Recycle Bin?" data-title="Delete Order" aria-label="Delete Order" title="Delete Order"><i class="bi bi-trash"></i></button>
                                 {% else %}
                                     <span class="text-muted small">View Only</span>
                                 {% endif %}
@@ -105,13 +104,12 @@
                     {% empty %}
                     <tr>
                         <td colspan="7" class="text-center py-5">
-                            <div class="d-flex flex-column align-items-center">
-                                <div class="bg-light rounded-circle d-flex align-items-center justify-content-center mb-3" style="width: 80px; height: 80px;">
-                                    <i class="bi bi-cart-x text-muted fs-1"></i>
-                                </div>
-                                <h5 class="fw-bold text-dark">No Orders Found</h5>
-                                <p class="text-muted mb-4">Orders appear here when your leads convert.</p>
-                            </div>
+                            <i class="bi bi-cart-x text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <h5 class="fw-bold text-dark">No Orders Found</h5>
+                            <p class="text-muted mb-4">Orders appear here when your leads convert.</p>
+                            {% if request.user.is_staff and perms.orders.add_order %}
+                            <a href="{% url 'order_create' %}" class="btn btn-sm btn-primary"><i class="bi bi-plus-lg me-1"></i> Add your first order</a>
+                            {% endif %}
                         </td>
                     </tr>
                     {% endfor %}
@@ -119,31 +117,8 @@
             </table>
         </div>
     </div>
-    
-    {% if orders.has_other_pages %}
-    <div class="card-footer bg-white py-3">
-        <ul class="pagination justify-content-center mb-0">
-            {% if orders.has_previous %}
-            <li class="page-item"><a class="page-link" href="?page={{ orders.previous_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Previous</a></li>
-            {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#">Previous</a></li>
-            {% endif %}
-            
-            {% for num in orders.paginator.page_range %}
-                {% if orders.number == num %}
-                <li class="page-item active"><a class="page-link" href="#">{{ num }}</a></li>
-                {% elif num > orders.number|add:'-3' and num < orders.number|add:'3' %}
-                <li class="page-item"><a class="page-link" href="?page={{ num }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">{{ num }}</a></li>
-                {% endif %}
-            {% endfor %}
-            
-            {% if orders.has_next %}
-            <li class="page-item"><a class="page-link" href="?page={{ orders.next_page_number }}{% if search_query %}&q={{ search_query }}{% endif %}{% if status_filter %}&status={{ status_filter }}{% endif %}">Next</a></li>
-            {% else %}
-            <li class="page-item disabled"><a class="page-link" href="#">Next</a></li>
-            {% endif %}
-        </ul>
-    </div>
-    {% endif %}
 </div>
+
+{% include 'includes/pagination.html' %}
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

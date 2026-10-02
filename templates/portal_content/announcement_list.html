@@ -1,20 +1,38 @@
 {% extends 'base.html' %}
 {% block title %}Announcements | Partner Portal{% endblock %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-4">
-    <h2><i class="bi bi-megaphone"></i> Announcements</h2>
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-megaphone-fill text-primary me-2"></i>Announcements</h2>
+        <p class="text-muted mb-0">System updates and notifications for partners.</p>
+    </div>
     {% if request.user.is_staff %}
-    <a href="{% url 'announcement_create' %}" class="btn btn-primary"><i class="bi bi-plus-circle"></i> Add Announcement</a>
+    <a href="{% url 'announcement_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold mt-2 mt-md-0"><i class="bi bi-plus-lg me-2"></i>Add Announcement</a>
     {% endif %}
 </div>
 
 <div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <form method="GET" class="d-flex w-100 gap-2">
+            <div class="input-group">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control border-start-0 ps-0" placeholder="Search announcements by title...">
+                {% if request.GET.q %}
+                <a href="?" class="btn border border-start-0 bg-white text-muted"><i class="bi bi-x-lg"></i></a>
+                {% endif %}
+            </div>
+            <button type="submit" class="btn btn-primary px-4">Search</button>
+        </form>
+    </div>
     <div class="card-body p-0">
         <div class="table-responsive">
-            <table class="table table-hover mb-0 align-middle">
-                <thead class="table-light">
+            <table class="table table-custom table-hover mb-0 align-middle">
+                <thead>
                     <tr>
-                        <th>Title & Content</th>
+                        <th class="ps-4" style="width: 40%">Title & Content</th>
+                        {% if request.user.is_staff %}
+                        <th>Audience</th>
+                        {% endif %}
                         <th>Status</th>
                         <th>Created At</th>
                         {% if request.user.is_staff %}
@@ -23,12 +41,21 @@
                     </tr>
                 </thead>
                 <tbody>
-                    {% for item in announcements %}
+                    {% for item in page_obj %}
                     <tr>
-                        <td>
-                            <strong class="text-primary">{{ item.title }}</strong><br>
-                            <small class="text-muted">{{ item.content|truncatewords:20 }}</small>
+                        <td class="ps-4">
+                            <strong class="text-primary d-block mb-1">{{ item.title }}</strong>
+                            <div class="text-muted text-truncate" style="max-width: 300px;">{{ item.content }}</div>
                         </td>
+                        {% if request.user.is_staff %}
+                        <td>
+                            {% if item.visible_to.exists %}
+                                <span class="badge bg-info">Selected partners ({{ item.visible_to.count }})</span>
+                            {% else %}
+                                <span class="badge bg-secondary">Public</span>
+                            {% endif %}
+                        </td>
+                        {% endif %}
                         <td>
                             {% if item.is_active %}
                             <span class="badge bg-success">Active</span>
@@ -40,15 +67,21 @@
                         {% if request.user.is_staff %}
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
-                                <a href="{% url 'announcement_update' item.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'announcement_delete' item.pk %}" data-message="Are you sure you want to delete announcement '{{ item.title }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                <a href="{% url 'announcement_update' item.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Announcement" aria-label="Edit Announcement"><i class="bi bi-pencil"></i></a>
+                                <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'announcement_delete' item.pk %}" data-message="Are you sure you want to move announcement '{{ item.title }}' to the Recycle Bin?" data-title="Delete Announcement" aria-label="Delete Announcement" title="Delete Announcement"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                         {% endif %}
                     </tr>
                     {% empty %}
                     <tr>
-                        <td colspan="4" class="text-center py-4 text-muted">No announcements available.</td>
+                        <td colspan="5" class="text-center py-5 text-muted">
+                            <i class="bi bi-megaphone text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <p class="mb-3">No announcements available.</p>
+                            {% if request.user.is_staff %}
+                            <a href="{% url 'announcement_create' %}" class="btn btn-sm btn-primary">Add your first announcement</a>
+                            {% endif %}
+                        </td>
                     </tr>
                     {% endfor %}
                 </tbody>
@@ -56,4 +89,7 @@
         </div>
     </div>
 </div>
+
+{% include 'includes/pagination.html' %}
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}
