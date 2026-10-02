@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.apps import apps
 from django.core.exceptions import PermissionDenied
+from django.contrib.auth.models import User
 
 def get_soft_deleted_models():
     # Dictionary of model name to actual model class
@@ -106,7 +107,6 @@ def empty_bin(request, model_name):
         raise PermissionDenied
         
     if model_name == 'user':
-        from django.contrib.auth.models import User
         users = User.objects.filter(is_active=False)
         count = users.count()
         users.delete()
