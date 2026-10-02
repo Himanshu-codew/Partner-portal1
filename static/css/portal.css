@@ -13,12 +13,32 @@
     --radius: 12px;
     --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.05);
     --bg-color: #f1f5f9;
+    --text-main: #334155;
+    --text-muted: #64748b;
+}
+
+[data-theme="dark"] {
+    --surface: #1e293b;
+    --border: #334155;
+    --bg-color: #0f172a;
+    --text-main: #f8fafc;
+    --text-muted: #94a3b8;
+    --shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.5), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+    
+    /* Bootstrap overrides for dark mode */
+    --bs-body-bg: var(--bg-color);
+    --bs-body-color: var(--text-main);
+    --bs-heading-color: #ffffff;
+    --bs-card-bg: var(--surface);
+    --bs-border-color: var(--border);
+    --bs-light: #334155;
+    --bs-light-rgb: 51, 65, 85;
 }
 
 body {
     font-family: 'Inter', system-ui, -apple-system, sans-serif;
     background-color: var(--bg-color);
-    color: #334155;
+    color: var(--text-main);
     animation: fadeIn 0.2s ease-in-out;
 }
 

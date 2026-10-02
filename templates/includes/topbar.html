@@ -1,0 +1,98 @@
+<div class="topbar d-flex align-items-center justify-content-between px-3 py-2 bg-white shadow-sm mb-4 sticky-top" style="z-index: 1030; background-color: var(--surface) !important; border-bottom: 1px solid var(--border);">
+    <div class="d-flex align-items-center">
+        <!-- Mobile Toggle -->
+        <button class="btn border-0 p-0 fs-4 text-secondary d-md-none me-3" type="button" data-bs-toggle="offcanvas" data-bs-target="#sidebarOffcanvas">
+            <i class="bi bi-list"></i>
+        </button>
+        
+        <!-- Search Input -->
+        <div class="input-group d-none d-sm-flex" style="width: 250px;">
+            <span class="input-group-text bg-light border-end-0 text-muted" style="background-color: var(--bg-color) !important; border-color: var(--border) !important;"><i class="bi bi-search"></i></span>
+            <input type="text" class="form-control bg-light border-start-0" placeholder="Search leads, orders..." style="background-color: var(--bg-color) !important; border-color: var(--border) !important; color: var(--text-main);">
+        </div>
+    </div>
+    
+    <div class="d-flex align-items-center gap-3">
+        <!-- Theme Toggle -->
+        <button id="themeToggleBtn" class="btn btn-link text-secondary p-0 text-decoration-none fs-5">
+            <i class="bi bi-moon-stars" id="themeIcon"></i>
+        </button>
+
+        <!-- Notifications -->
+        <div class="dropdown">
+            {% get_notifications_count as topbar_notifications_count %}
+            <button class="btn btn-link text-secondary p-0 text-decoration-none fs-5 position-relative" type="button" data-bs-toggle="dropdown" aria-expanded="false">
+                <i class="bi bi-bell"></i>
+                {% if topbar_notifications_count > 0 %}
+                <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger" style="font-size: 0.65rem;">
+                    {{ topbar_notifications_count }}
+                </span>
+                {% endif %}
+            </button>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2 p-0" style="width: 280px;">
+                <li class="p-3 border-bottom text-muted fw-bold" style="border-color: var(--border) !important;">Notifications</li>
+                {% if topbar_notifications_count > 0 %}
+                    <li class="p-3 text-center text-muted small">You have {{ topbar_notifications_count }} new notification(s).</li>
+                {% else %}
+                    <li class="p-3 text-center text-muted small">No new notifications</li>
+                {% endif %}
+            </ul>
+        </div>
+
+        <!-- User Dropdown -->
+        <div class="dropdown ms-1">
+            <div class="user-avatar shadow-sm" data-bs-toggle="dropdown" aria-expanded="false" style="cursor: pointer; width: 36px; height: 36px; border-radius: 50%; background: var(--primary); color: white; display: flex; align-items: center; justify-content: center; font-weight: 600; font-size: 1.1rem;">
+                {{ request.user.username|make_list|first|upper }}
+            </div>
+            <ul class="dropdown-menu dropdown-menu-end shadow border-0 mt-2">
+                <li class="px-3 py-2 border-bottom mb-1">
+                    <div class="fw-bold">{{ request.user.get_full_name|default:request.user.username }}</div>
+                    <div class="small text-muted">{{ request.user.email }}</div>
+                </li>
+                <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i> Profile</a></li>
+                <li><hr class="dropdown-divider"></li>
+                <li>
+                    <form action="{% url 'logout' %}" method="post">
+                        {% csrf_token %}
+                        <button type="submit" class="dropdown-item text-danger"><i class="bi bi-box-arrow-right me-2"></i> Logout</button>
+                    </form>
+                </li>
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+document.addEventListener("DOMContentLoaded", function() {
+    const themeBtn = document.getElementById('themeToggleBtn');
+    const themeIcon = document.getElementById('themeIcon');
+    
+    function updateIcon(theme) {
+        if (theme === 'dark') {
+            themeIcon.classList.remove('bi-moon-stars');
+            themeIcon.classList.add('bi-sun');
+        } else {
+            themeIcon.classList.remove('bi-sun');
+            themeIcon.classList.add('bi-moon-stars');
+        }
+    }
+    
+    const currentTheme = document.documentElement.getAttribute('data-theme') || 'light';
+    updateIcon(currentTheme);
+    
+    if (themeBtn) {
+        themeBtn.addEventListener('click', function() {
+            let newTheme = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+            
+            document.documentElement.setAttribute('data-theme', newTheme);
+            document.documentElement.setAttribute('data-bs-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            updateIcon(newTheme);
+            
+            // Dispatch event for charts to update colors if needed
+            window.dispatchEvent(new Event('themeChanged'));
+        });
+    }
+});
+</script>

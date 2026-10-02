@@ -1,0 +1,26 @@
+<div class="card shadow-sm border-0 h-100">
+    <div class="card-header bg-white border-bottom pt-4 pb-3 d-flex justify-content-between align-items-center">
+        <h5 class="fw-bold mb-0">Announcements</h5>
+        {% if perms.portal_content.view_announcement %}
+        <a href="{% url 'announcement_list' %}" class="small text-decoration-none">View All</a>
+        {% endif %}
+    </div>
+    <div class="card-body p-0">
+        {% if announcements %}
+        <ul class="list-group list-group-flush">
+            {% for ann in announcements %}
+            <li class="list-group-item px-4 py-3">
+                <h6 class="fw-bold mb-1">{{ ann.title }}</h6>
+                <p class="small text-muted mb-2"><i class="bi bi-calendar3 me-1"></i> {{ ann.created_at|date:"M d, Y" }}</p>
+                <p class="small mb-0 text-truncate">{{ ann.content }}</p>
+            </li>
+            {% endfor %}
+        </ul>
+        {% else %}
+        <div class="text-center py-5 text-muted">
+            <i class="bi bi-megaphone text-light mb-3" style="font-size: 3rem;"></i>
+            <p>No active announcements.</p>
+        </div>
+        {% endif %}
+    </div>
+</div>
