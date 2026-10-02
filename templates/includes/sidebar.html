@@ -1,3 +1,4 @@
+{% load core_extras %}
 <ul class="sidebar-nav flex-grow-1 pb-3">
     <li class="sidebar-item {% if request.path == '/' %}active{% endif %}">
         <a href="{% url 'dashboard' %}" class="sidebar-link">
