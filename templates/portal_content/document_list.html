@@ -52,27 +52,36 @@
                         </td>
                         {% endif %}
                         <td>
-                            {% with ext=doc.file.name|slice:"-4:"|lower %}
                             <div class="d-flex align-items-center text-muted small">
-                                {% if '.pdf' in ext %}
+                                {% if not doc.file_exists %}
+                                <i class="bi bi-file-earmark-x fs-4 text-secondary me-2"></i>
+                                <span class="text-muted fst-italic">—</span>
+                                {% elif doc.file_extension == 'pdf' %}
                                 <i class="bi bi-file-earmark-pdf fs-4 text-danger me-2"></i>
-                                {% elif '.doc' in ext or '.docx' in ext %}
+                                {{ doc.file_size_display }}
+                                {% elif doc.file_extension == 'doc' or doc.file_extension == 'docx' %}
                                 <i class="bi bi-file-earmark-word fs-4 text-primary me-2"></i>
-                                {% elif '.xls' in ext or '.xlsx' in ext %}
+                                {{ doc.file_size_display }}
+                                {% elif doc.file_extension == 'xls' or doc.file_extension == 'xlsx' or doc.file_extension == 'csv' %}
                                 <i class="bi bi-file-earmark-excel fs-4 text-success me-2"></i>
-                                {% elif '.png' in ext or '.jpg' in ext or '.jpeg' in ext %}
+                                {{ doc.file_size_display }}
+                                {% elif doc.file_extension == 'png' or doc.file_extension == 'jpg' or doc.file_extension == 'jpeg' or doc.file_extension == 'gif' or doc.file_extension == 'webp' %}
                                 <i class="bi bi-file-earmark-image fs-4 text-info me-2"></i>
+                                {{ doc.file_size_display }}
                                 {% else %}
                                 <i class="bi bi-file-earmark fs-4 text-secondary me-2"></i>
+                                {{ doc.file_size_display }}
                                 {% endif %}
-                                {{ doc.file.size|filesizeformat }}
                             </div>
-                            {% endwith %}
                         </td>
                         <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
+                                {% if doc.file_exists %}
                                 <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-white text-dark" data-bs-toggle="tooltip" title="Download" aria-label="Download Document"><i class="bi bi-download"></i></a>
+                                {% else %}
+                                <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1 small" data-bs-toggle="tooltip" title="The file is missing from storage (Render ephemeral disk)"><i class="bi bi-exclamation-circle me-1"></i>File missing</span>
+                                {% endif %}
                                 {% if request.user.is_staff %}
                                 <a href="{% url 'document_update' doc.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Document" aria-label="Edit Document"><i class="bi bi-pencil"></i></a>
                                 <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'document_delete' doc.pk %}" data-message="Are you sure you want to move document '{{ doc.title }}' to the Recycle Bin?" data-title="Delete Document" aria-label="Delete Document" title="Delete Document"><i class="bi bi-trash"></i></button>

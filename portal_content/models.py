@@ -1,3 +1,4 @@
+import os
 from core.models import SoftDeleteModel
 from django.db import models
 
@@ -31,3 +32,42 @@ class Document(SoftDeleteModel):
 
     def __str__(self):
         return self.title
+
+    @property
+    def file_exists(self):
+        """True only if the file field is set AND the file is actually on storage."""
+        if not self.file:
+            return False
+        try:
+            return self.file.storage.exists(self.file.name)
+        except Exception:
+            return False
+
+    @property
+    def file_extension(self):
+        """Lowercase extension without dot, or '' if no file."""
+        if not self.file or not self.file.name:
+            return ''
+        try:
+            _, ext = os.path.splitext(self.file.name)
+            return ext.lstrip('.').lower()
+        except Exception:
+            return ''
+
+    @property
+    def file_size_display(self):
+        """Human-readable file size, or '—' if the file is missing/unreadable."""
+        if not self.file:
+            return '\u2014'
+        try:
+            size = self.file.size  # raises if file missing on disk
+            if size < 1024:
+                return f'{size} B'
+            elif size < 1024 ** 2:
+                return f'{size / 1024:.1f} KB'
+            elif size < 1024 ** 3:
+                return f'{size / 1024 ** 2:.1f} MB'
+            else:
+                return f'{size / 1024 ** 3:.2f} GB'
+        except (FileNotFoundError, ValueError, OSError):
+            return '\u2014'
