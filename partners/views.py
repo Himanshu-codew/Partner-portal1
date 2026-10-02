@@ -56,7 +56,7 @@ def user_list(request):
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
         
-    users = User.objects.all().order_by('-date_joined')
+    users = User.objects.filter(is_active=True).order_by('-date_joined')
     return render(request, 'partners/user_list.html', {'users': users})
 
 @login_required(login_url='/login/')
@@ -144,26 +144,15 @@ def user_update(request, pk):
 def user_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     u = get_object_or_404(User, pk=pk)
-    u.is_active = not u.is_active
-    u.save()
-    status = 'activated' if u.is_active else 'deactivated'
-    messages.success(request, f'User {status}!')
-    return redirect('user_list')
-
-@login_required(login_url='/login/')
-@require_POST
-def user_hard_delete(request, pk):
-    if not request.user.is_staff: return redirect('dashboard')
-    u = get_object_or_404(User, pk=pk)
     
     # Prevent deleting yourself
     if u == request.user:
         messages.error(request, "You cannot delete your own account.")
         return redirect('user_list')
         
-    username = u.username
-    u.delete()
-    messages.success(request, f"User '{username}' permanently deleted!")
+    u.is_active = False
+    u.save()
+    messages.success(request, f"User '{u.username}' moved to Recycle Bin.")
     return redirect('user_list')
 
 @login_required(login_url='/login/')
