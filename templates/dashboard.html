@@ -84,13 +84,15 @@
                     <a href="?range=12m" class="btn btn-outline-secondary {% if not request.GET.range or request.GET.range == '12m' %}active{% endif %}">12M</a>
                 </div>
             </div>
-            <div class="card-body">
+            <div class="card-body pb-3">
                 {% if orders_chart %}
-                <span id="ordersChartNote" class="small text-muted fst-italic mb-2" style="display:none;">Not enough data yet — showing available points.</span>
-                <canvas id="ordersChart" height="250"></canvas>
+                <span id="ordersChartNote" class="small text-muted fst-italic d-block mb-1" style="display:none;">Not enough data yet — showing available points.</span>
+                <div class="chart-box">
+                    <canvas id="ordersChart"></canvas>
+                </div>
                 {% else %}
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted py-5">
-                    <i class="bi bi-bar-chart text-light" style="font-size: 3rem;"></i>
+                <div class="d-flex flex-column align-items-center justify-content-center text-muted py-5">
+                    <i class="bi bi-bar-chart" style="font-size: 3rem; color: var(--text-muted);"></i>
                     <p class="mt-2">No orders data available to display.</p>
                 </div>
                 {% endif %}
@@ -102,12 +104,14 @@
             <div class="card-header border-bottom-0 pt-4 pb-0">
                 <h5 class="fw-bold mb-0">Leads by Status</h5>
             </div>
-            <div class="card-body position-relative">
+            <div class="card-body pb-3">
                 {% if leads_chart %}
-                <canvas id="leadsChart" height="250"></canvas>
+                <div class="chart-box chart-box--doughnut">
+                    <canvas id="leadsChart"></canvas>
+                </div>
                 {% else %}
-                <div class="d-flex flex-column align-items-center justify-content-center h-100 text-muted py-5">
-                    <i class="bi bi-pie-chart text-light" style="font-size: 3rem;"></i>
+                <div class="d-flex flex-column align-items-center justify-content-center text-muted py-5">
+                    <i class="bi bi-pie-chart" style="font-size: 3rem; color: var(--text-muted);"></i>
                     <p class="mt-2">No leads data available.</p>
                 </div>
                 {% endif %}

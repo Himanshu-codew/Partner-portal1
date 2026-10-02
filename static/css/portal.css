@@ -473,6 +473,28 @@ form textarea:focus {
 }
 
 /* ═══════════════════════════════════════════════
+   CHART BOXES — fixed-height containers
+   Root-cause fix for Chart.js infinite resize loop:
+   maintainAspectRatio:false reads the parent's
+   offsetHeight; a fixed px height breaks the loop.
+═══════════════════════════════════════════════ */
+.chart-box {
+    position: relative;
+    width: 100%;
+    min-width: 0;       /* never overflow a flex parent */
+    height: 300px;
+}
+.chart-box--doughnut {
+    height: 270px;
+}
+@media (max-width: 575.98px) {
+    .chart-box          { height: 220px; }
+    .chart-box--doughnut{ height: 220px; }
+}
+/* Ensure the card itself never stretches the chart-box */
+.card-body .chart-box { flex-shrink: 0; }
+
+/* ═══════════════════════════════════════════════
    DASHBOARD — stat cards & icon circles
 ═══════════════════════════════════════════════ */
 .stat-card {
