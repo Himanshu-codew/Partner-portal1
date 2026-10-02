@@ -67,7 +67,7 @@
     <a href="{% url 'order_create' %}" class="btn btn-success shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-cart-plus me-2"></i>Add Order</a>
     {% endif %}
     {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff and request.user.partner_profile.is_approved %}
-    <a href="{% url 'ticket_create' %}" class="btn btn-outline-secondary bg-white shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-headset me-2"></i>Raise Ticket</a>
+    <a href="{% url 'ticket_create' %}" class="btn btn-white shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-headset me-2"></i>Raise Ticket</a>
     {% endif %}
 </div>
 

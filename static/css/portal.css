@@ -260,3 +260,18 @@ form input:focus, form select:focus, form textarea:focus {
 }
 .helptext { font-size: 0.875em; color: #6c757d; display: block; margin-top: 0.25rem; }
 .errorlist { color: #dc3545; list-style: none; padding-left: 0; font-size: 0.875em; margin-bottom: 0.5rem; }
+
+/* Custom Buttons */
+.btn-white {
+    background-color: var(--surface);
+    color: var(--text-main);
+    border: 1px solid var(--border);
+}
+.btn-white:hover {
+    background-color: var(--bg-color);
+    color: var(--text-main);
+    border-color: #cbd5e1;
+}
+[data-theme="dark"] .btn-white:hover {
+    border-color: #475569;
+}
