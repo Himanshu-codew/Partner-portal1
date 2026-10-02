@@ -462,6 +462,23 @@ form textarea:focus {
     border-color: var(--border) !important;
 }
 
+/* Selected choice pills in multi-select */
+[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: var(--surface-2);
+    border-color: var(--border);
+    color: var(--text-main);
+}
+[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__display {
+    color: var(--text-main);
+}
+[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__remove {
+    color: var(--text-muted);
+}
+[data-theme="dark"] .select2-container--default .select2-selection--multiple .select2-selection__choice__remove:hover {
+    color: var(--text-main);
+    background-color: transparent;
+}
+
 /* ═══════════════════════════════════════════════
    AVATAR
 ═══════════════════════════════════════════════ */
