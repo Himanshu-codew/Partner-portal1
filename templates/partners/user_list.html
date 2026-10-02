@@ -43,6 +43,10 @@
                                     <button type="submit" class="btn btn-sm btn-outline-success" data-bs-toggle="tooltip" title="Activate"><i class="bi bi-person-check"></i></button>
                                     {% endif %}
                                 </form>
+                                <form action="{% url 'user_hard_delete' u.pk %}" method="post" class="mb-0">
+                                    {% csrf_token %}
+                                    <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'user_hard_delete' u.pk %}" data-message="Are you sure you want to permanently delete user '{{ u.username }}'? This action cannot be undone." title="Delete Permanently"><i class="bi bi-trash"></i></button>
+                                </form>
                             </div>
                         </td>
                     </tr>

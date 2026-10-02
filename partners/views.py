@@ -151,6 +151,22 @@ def user_delete(request, pk):
     return redirect('user_list')
 
 @login_required(login_url='/login/')
+@require_POST
+def user_hard_delete(request, pk):
+    if not request.user.is_staff: return redirect('dashboard')
+    u = get_object_or_404(User, pk=pk)
+    
+    # Prevent deleting yourself
+    if u == request.user:
+        messages.error(request, "You cannot delete your own account.")
+        return redirect('user_list')
+        
+    username = u.username
+    u.delete()
+    messages.success(request, f"User '{username}' permanently deleted!")
+    return redirect('user_list')
+
+@login_required(login_url='/login/')
 def group_update(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     g = get_object_or_404(Group, pk=pk)
