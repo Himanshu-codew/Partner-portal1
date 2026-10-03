@@ -170,7 +170,7 @@ def notifications_feed(request):
                 'title': t.subject,
                 'msg': f"Ticket from {t.partner.company_name} — {t.get_status_display()}",
                 'time': _humanize_time(t.created_at),
-                'url': '/support/tickets/',
+                'url': '/support/',
                 'unread': t.created_at > last_read,
             })
 
@@ -234,7 +234,7 @@ def notifications_feed(request):
                     'title': t.subject,
                     'msg': f"Admin replied — {t.get_status_display()}",
                     'time': _humanize_time(t.updated_at),
-                    'url': '/support/tickets/',
+                    'url': '/support/',
                     'unread': t.updated_at > last_read,
                 })
 
@@ -258,7 +258,7 @@ def notifications_feed(request):
                 'title': f"Commission paid — #{o.order_number}",
                 'msg': f"₹{o.commission_amount:.0f} credited",
                 'time': _humanize_time(o.created_at),
-                'url': '/orders/commissions/',
+                'url': '/orders/commission/',
                 'unread': o.created_at > last_read,
             })
 
