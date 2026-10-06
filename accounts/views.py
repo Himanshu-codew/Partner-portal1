@@ -1,17 +1,19 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
-from django.db.models import Sum, Count
+from django.db.models import Sum, Count, Q
 from django.db.models.functions import TruncMonth, TruncDay
-from django.core.exceptions import ObjectDoesNotExist
+from django.contrib import messages
+from django.utils import timezone
+import datetime
 
 from leads.models import Lead
 from orders.models import Order
 from support.models import Ticket
 from partners.models import PartnerProfile
 from portal_content.models import Announcement
+from partners.utils import get_partner_profile
+from .forms import PartnerRegistrationForm, PartnerProfileUpdateForm, UserUpdateForm
 
-import datetime
-from django.utils import timezone
 
 def get_month_range(dt):
     start = dt.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
@@ -20,6 +22,7 @@ def get_month_range(dt):
     else:
         end = start.replace(month=start.month + 1) - datetime.timedelta(microseconds=1)
     return start, end
+
 
 def calculate_trend(current_val, previous_val):
     if previous_val == 0:
@@ -37,6 +40,7 @@ def calculate_trend(current_val, previous_val):
     else:
         return {'direction': 'flat', 'value': 0}
 
+
 def compact_currency(amount):
     if amount >= 10000000:
         return f"₹{amount/10000000:.1f}Cr".replace('.0', '')
@@ -46,6 +50,18 @@ def compact_currency(amount):
         return f"₹{amount/1000:.1f}K".replace('.0', '')
     else:
         return f"₹{int(amount)}"
+
+
+@login_required(login_url='/login/')
+def approval_pending(request):
+    """View shown to users whose partner account is pending admin approval."""
+    if request.user.is_staff:
+        return redirect('dashboard')
+    profile = get_partner_profile(request.user)
+    if profile and profile.is_approved:
+        return redirect('dashboard')
+    return render(request, 'approval_pending.html')
+
 
 @login_required(login_url='/login/')
 def dashboard(request):
@@ -77,25 +93,21 @@ def dashboard(request):
         prev_comm = prev_orders.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
         prev_earnings = prev_collected - prev_comm
     else:
-        try:
-            profile = request.user.partner_profile
-            leads_qs = Lead.objects.filter(partner=profile)
-            orders_qs = Order.objects.filter(partner=profile)
-            tickets_qs = Ticket.objects.filter(partner=profile)
-            earnings = Order.objects.filter(partner=profile, is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
-            
-            curr_orders = Order.objects.filter(partner=profile, created_at__range=(curr_start, curr_end))
-            curr_earnings = curr_orders.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
-            
-            prev_orders = Order.objects.filter(partner=profile, created_at__range=(prev_start, prev_end))
-            prev_earnings = prev_orders.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
-        except (PartnerProfile.DoesNotExist, ObjectDoesNotExist):
-            leads_qs = Lead.objects.none()
-            orders_qs = Order.objects.none()
-            tickets_qs = Ticket.objects.none()
-            earnings = 0
-            curr_earnings = 0
-            prev_earnings = 0
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.warning(request, "Your account is waiting for administrator approval.")
+            return redirect('approval_pending')
+
+        leads_qs = Lead.objects.filter(partner=profile)
+        orders_qs = Order.objects.filter(partner=profile)
+        tickets_qs = Ticket.objects.filter(partner=profile)
+        earnings = Order.objects.filter(partner=profile, is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
+        
+        curr_orders = Order.objects.filter(partner=profile, created_at__range=(curr_start, curr_end))
+        curr_earnings = curr_orders.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
+        
+        prev_orders = Order.objects.filter(partner=profile, created_at__range=(prev_start, prev_end))
+        prev_earnings = prev_orders.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
 
     leads_count = leads_qs.count()
     orders_count = orders_qs.count()
@@ -115,7 +127,6 @@ def dashboard(request):
 
     # Chart 1: Leads by status
     leads_chart = list(leads_qs.values('status').annotate(count=Count('id')))
-    # Translate DB status choices to friendly names if needed
     status_map = dict(Lead.STATUS_CHOICES)
     for l in leads_chart:
         l['status_label'] = status_map.get(l['status'], l['status'])
@@ -153,7 +164,7 @@ def dashboard(request):
                     'count': o['count']
                 })
     else: # 12m or default
-        start_date = now - relativedelta(months=12) if 'relativedelta' in globals() else now - datetime.timedelta(days=365)
+        start_date = now - datetime.timedelta(days=365)
         chart_orders_qs = orders_qs.filter(created_at__gte=start_date)
         orders_chart_raw = list(chart_orders_qs.annotate(month=TruncMonth('created_at'))
                                          .values('month')
@@ -167,9 +178,9 @@ def dashboard(request):
                     'count': o['count']
                 })
 
-    # Recent Activity
+    # Recent Activity with select_related
     events = []
-    for l in leads_qs.order_by('-created_at')[:8]:
+    for l in leads_qs.select_related('partner', 'partner__user').order_by('-created_at')[:8]:
         events.append({
             'type': 'Lead', 
             'title': f"New Lead: {l.customer_name}", 
@@ -178,7 +189,7 @@ def dashboard(request):
             'icon': 'bi-person-lines-fill',
             'color': 'primary'
         })
-    for o in orders_qs.select_related('partner').order_by('-created_at')[:8]:
+    for o in orders_qs.select_related('partner', 'partner__user').order_by('-created_at')[:8]:
         events.append({
             'type': 'Order', 
             'title': f"Order #{o.order_number}", 
@@ -187,7 +198,7 @@ def dashboard(request):
             'icon': 'bi-cart-check',
             'color': 'success'
         })
-    for t in tickets_qs.select_related('partner').order_by('-created_at')[:8]:
+    for t in tickets_qs.select_related('partner', 'partner__user').order_by('-created_at')[:8]:
         events.append({
             'type': 'Ticket', 
             'title': f"Ticket: {t.subject}", 
@@ -202,27 +213,26 @@ def dashboard(request):
     # Announcements
     announcements = Announcement.objects.filter(is_active=True).order_by('-created_at')[:3]
 
-    from django.db.models import Q
-    recent_leads = leads_qs.order_by('-created_at')[:5]
+    recent_leads = leads_qs.select_related('partner', 'partner__user').order_by('-created_at')[:5]
 
     total_commission_paid = 0
     total_commission_pending = 0
     top_partners = []
     
     if is_staff:
-        total_commission_paid = commission_paid # Already calculated above
+        total_commission_paid = commission_paid
         total_commission_pending = Order.objects.filter(is_commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or 0
         
         top_partners = PartnerProfile.objects.annotate(
             total_earnings=Sum('orders__commission_amount', filter=Q(orders__is_commission_paid=True))
-        ).filter(total_earnings__isnull=False).order_by('-total_earnings')[:5]
+        ).filter(total_earnings__isnull=False).select_related('user').order_by('-total_earnings')[:5]
     else:
-        try:
-            profile = request.user.partner_profile
-            total_commission_paid = earnings # Already calculated above
+        profile = get_partner_profile(request.user)
+        total_commission_paid = earnings
+        if profile:
             total_commission_pending = Order.objects.filter(partner=profile, is_commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or 0
-        except:
-            pass
+        else:
+            total_commission_pending = 0
 
     total_commission_all = total_commission_paid + total_commission_pending
     commission_summary = {
@@ -249,19 +259,14 @@ def dashboard(request):
     }
     return render(request, 'dashboard.html', context)
 
+
 @login_required(login_url='/login/')
 def profile_view(request):
-    try:
-        profile = request.user.partner_profile
-    except (PartnerProfile.DoesNotExist, ObjectDoesNotExist):
-        profile = None
+    profile = get_partner_profile(request.user)
     return render(request, 'profile.html', {'profile': profile})
 
+
 def register_view(request):
-    from .forms import PartnerRegistrationForm
-    from partners.models import PartnerProfile
-    from django.contrib import messages
-    
     if request.method == 'POST':
         form = PartnerRegistrationForm(request.POST)
         if form.is_valid():
@@ -270,7 +275,7 @@ def register_view(request):
             user.email = form.cleaned_data.get('email', '')
             user.save()
             
-            # Create the partner profile and auto-approve them
+            # New registrations create unapproved PartnerProfile
             PartnerProfile.objects.create(
                 user=user,
                 company_name=form.cleaned_data['company_name'],
@@ -278,7 +283,7 @@ def register_view(request):
                 is_approved=False
             )
             
-            messages.success(request, 'Application submitted! You can log in now; full access is enabled after admin approval.')
+            messages.success(request, 'Account created. You can log in once an admin approves it.')
             return redirect('login')
     else:
         form = PartnerRegistrationForm()
@@ -288,15 +293,8 @@ def register_view(request):
 
 @login_required(login_url='/login/')
 def profile_edit(request):
-    try:
-        profile = request.user.partner_profile
-        has_profile = True
-    except (PartnerProfile.DoesNotExist, ObjectDoesNotExist):
-        profile = None
-        has_profile = False
-        
-    from .forms import PartnerProfileUpdateForm, UserUpdateForm
-    from django.contrib import messages
+    profile = get_partner_profile(request.user)
+    has_profile = profile is not None
     
     if request.method == 'POST':
         u_form = UserUpdateForm(request.POST, instance=request.user)

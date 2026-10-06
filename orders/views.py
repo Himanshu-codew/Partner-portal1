@@ -3,25 +3,28 @@ from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.paginator import Paginator
-from django.db.models import Q
+from django.db.models import Q, Sum, F, ExpressionWrapper, DecimalField
 from .models import Order
 from .forms import OrderForm
-from partners.models import PartnerProfile
+from partners.utils import get_partner_profile
+
+def on_commission_paid(order):
+    """
+    Hook called when an order's commission is marked as paid.
+    Currently does nothing; reserved for future notifications.
+    """
+    pass
 
 @login_required(login_url='/login/')
 def order_list(request):
     if request.user.is_staff:
-        orders_qs = Order.objects.all().order_by('-created_at')
+        orders_qs = Order.objects.select_related('partner', 'partner__user', 'lead').all().order_by('-created_at')
     else:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.warning(request, "Your account is pending approval.")
-                return redirect('dashboard')
-            orders_qs = Order.objects.filter(partner=profile).order_by('-created_at')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to view orders.')
-            return redirect('dashboard')
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.warning(request, "Your account is waiting for administrator approval.")
+            return redirect('approval_pending')
+        orders_qs = Order.objects.select_related('partner', 'partner__user', 'lead').filter(partner=profile).order_by('-created_at')
 
     search_query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
@@ -49,19 +52,13 @@ def order_list(request):
 @login_required(login_url='/login/')
 def commission_list(request):
     if request.user.is_staff:
-        orders_qs = Order.objects.all().order_by('-created_at')
+        orders_qs = Order.objects.select_related('partner', 'partner__user').all().order_by('-created_at')
     else:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.warning(request, "Your account is pending approval.")
-                return redirect('dashboard')
-            orders_qs = Order.objects.filter(partner=profile).order_by('-created_at')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to view commissions.')
-            return redirect('dashboard')
-
-    from django.db.models import Sum, F, ExpressionWrapper, DecimalField
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.warning(request, "Your account is waiting for administrator approval.")
+            return redirect('approval_pending')
+        orders_qs = Order.objects.select_related('partner', 'partner__user').filter(partner=profile).order_by('-created_at')
 
     total_earned = orders_qs.filter(is_commission_paid=True).aggregate(total=Sum('commission_amount'))['total'] or 0
     pending_commission = orders_qs.filter(is_commission_paid=False).aggregate(total=Sum('commission_amount'))['total'] or 0
@@ -74,7 +71,6 @@ def commission_list(request):
     admin_total_revenue = total_amount_collected
 
     # Annotate each order with net_profit for admin table
-    from django.db.models import ExpressionWrapper, DecimalField, F
     orders_qs = orders_qs.annotate(
         net_profit=ExpressionWrapper(F('amount') - F('commission_amount'), output_field=DecimalField())
     )
@@ -126,25 +122,23 @@ def order_update_status(request, order_id):
         messages.error(request, 'Unauthorized access.')
         return redirect('order_list')
         
-    try:
-        order = Order.objects.get(id=order_id)
-        new_status = request.POST.get('status')
-        if new_status in dict(Order.STATUS_CHOICES):
-            order.status = new_status
-            order.save()
-            messages.success(request, f'Order #{order.id} status updated to {order.get_status_display()}.')
-    except Order.DoesNotExist:
-        messages.error(request, 'Order not found.')
+    order = get_object_or_404(Order, id=order_id)
+    new_status = request.POST.get('status')
+    if new_status in dict(Order.STATUS_CHOICES):
+        order.status = new_status
+        order.save()
+        messages.success(request, f'Order #{order.order_number} status updated to {order.get_status_display()}.')
             
     return redirect('order_list')
 
 @login_required(login_url='/login/')
 def order_update(request, pk):
-    order = get_object_or_404(Order, pk=pk)
+    # Rule 1.1: order_update is admin (is_staff) only
     if not request.user.is_staff:
         messages.error(request, 'Unauthorized access.')
         return redirect('order_list')
         
+    order = get_object_or_404(Order, pk=pk)
     if request.method == 'POST':
         form = OrderForm(request.POST, instance=order)
         if form.is_valid():
@@ -158,11 +152,47 @@ def order_update(request, pk):
 @login_required(login_url='/login/')
 @require_POST
 def order_delete(request, pk):
-    order = get_object_or_404(Order, pk=pk)
+    # Rule 1.1: order_delete is admin (is_staff) only
     if not request.user.is_staff:
         messages.error(request, 'Unauthorized access.')
         return redirect('order_list')
-            
+        
+    order = get_object_or_404(Order, pk=pk)
     order.soft_delete(request.user)
     messages.success(request, 'Moved to Recycle Bin')
+    return redirect('order_list')
+
+@login_required(login_url='/login/')
+@require_POST
+def order_mark_commission_paid(request, pk):
+    """Admin-only action to mark order commission as paid."""
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('order_list')
+        
+    order = get_object_or_404(Order, pk=pk)
+    order.is_commission_paid = True
+    order.save()
+    on_commission_paid(order)
+    messages.success(request, f'Order #{order.order_number} marked as commission paid.')
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        return redirect(referer)
+    return redirect('order_list')
+
+@login_required(login_url='/login/')
+@require_POST
+def order_mark_commission_unpaid(request, pk):
+    """Admin-only action to mark order commission as unpaid."""
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('order_list')
+        
+    order = get_object_or_404(Order, pk=pk)
+    order.is_commission_paid = False
+    order.save()
+    messages.success(request, f'Order #{order.order_number} marked as commission unpaid.')
+    referer = request.META.get('HTTP_REFERER')
+    if referer:
+        return redirect(referer)
     return redirect('order_list')

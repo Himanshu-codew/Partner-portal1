@@ -93,6 +93,17 @@
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
                                 {% if request.user.is_staff %}
+                                    {% if order.is_commission_paid %}
+                                    <form action="{% url 'order_mark_commission_unpaid' order.pk %}" method="post" class="d-inline mb-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-white text-warning" data-bs-toggle="tooltip" title="Mark Commission Unpaid" aria-label="Mark Commission Unpaid"><i class="bi bi-x-circle"></i></button>
+                                    </form>
+                                    {% else %}
+                                    <form action="{% url 'order_mark_commission_paid' order.pk %}" method="post" class="d-inline mb-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-white text-success" data-bs-toggle="tooltip" title="Mark Commission Paid" aria-label="Mark Commission Paid"><i class="bi bi-check-circle"></i></button>
+                                    </form>
+                                    {% endif %}
                                     <a href="{% url 'order_update' order.pk %}" class="btn btn-sm btn-white text-primary" data-bs-toggle="tooltip" title="Edit Order" aria-label="Edit Order"><i class="bi bi-pencil"></i></a>
                                     <button type="button" class="btn btn-sm btn-white text-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'order_delete' order.pk %}" data-message="Are you sure you want to move order '#{{ order.order_number }}' to the Recycle Bin?" data-title="Delete Order" aria-label="Delete Order" title="Delete Order"><i class="bi bi-trash"></i></button>
                                 {% else %}

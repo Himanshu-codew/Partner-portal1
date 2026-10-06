@@ -6,22 +6,18 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Ticket
 from .forms import TicketForm, AdminTicketForm
-from partners.models import PartnerProfile
+from partners.utils import get_partner_profile, user_can_access_object
 
 @login_required(login_url='/login/')
 def ticket_list(request):
     if request.user.is_staff:
-        tickets_qs = Ticket.objects.all().order_by('-created_at')
+        tickets_qs = Ticket.objects.select_related('partner', 'partner__user').all().order_by('-created_at')
     else:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.warning(request, "Your account is pending approval.")
-                return redirect('dashboard')
-            tickets_qs = Ticket.objects.filter(partner=profile).order_by('-created_at')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to view tickets.')
-            return redirect('dashboard')
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.warning(request, "Your account is waiting for administrator approval.")
+            return redirect('approval_pending')
+        tickets_qs = Ticket.objects.select_related('partner', 'partner__user').filter(partner=profile).order_by('-created_at')
 
     search_query = request.GET.get('q', '')
     status_filter = request.GET.get('status', '')
@@ -48,15 +44,12 @@ def ticket_list(request):
 
 @login_required(login_url='/login/')
 def ticket_create(request):
+    profile = None
     if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.error(request, 'Your account must be approved to create tickets.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to create tickets.')
-            return redirect('dashboard')
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.error(request, 'Your account must be approved to create tickets.')
+            return redirect('approval_pending')
 
     form_class = AdminTicketForm if request.user.is_staff else TicketForm
     
@@ -65,7 +58,7 @@ def ticket_create(request):
         if form.is_valid():
             ticket = form.save(commit=False)
             if not request.user.is_staff:
-                ticket.partner = request.user.partner_profile
+                ticket.partner = profile
             ticket.save()
             messages.success(request, 'Support ticket successfully created!')
             return redirect('ticket_list')
@@ -81,15 +74,12 @@ def ticket_update_status(request, ticket_id):
         messages.error(request, 'Unauthorized access.')
         return redirect('ticket_list')
         
-    try:
-        ticket = Ticket.objects.get(id=ticket_id)
-        new_status = request.POST.get('status')
-        if new_status in dict(Ticket.STATUS_CHOICES):
-            ticket.status = new_status
-            ticket.save()
-            messages.success(request, f'Ticket #{ticket.id} status updated to {ticket.get_status_display()}.')
-    except Ticket.DoesNotExist:
-        messages.error(request, 'Ticket not found.')
+    ticket = get_object_or_404(Ticket, id=ticket_id)
+    new_status = request.POST.get('status')
+    if new_status in dict(Ticket.STATUS_CHOICES):
+        ticket.status = new_status
+        ticket.save()
+        messages.success(request, f'Ticket #{ticket.id} status updated to {ticket.get_status_display()}.')
             
     return redirect('ticket_list')
 
@@ -97,14 +87,9 @@ def ticket_update_status(request, ticket_id):
 def ticket_update(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
     
-    if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if ticket.partner != profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+    if not user_can_access_object(request.user, ticket):
+        messages.error(request, 'Unauthorized access.')
+        return redirect('ticket_list')
 
     form_class = AdminTicketForm if request.user.is_staff else TicketForm
     if request.method == 'POST':
@@ -121,14 +106,9 @@ def ticket_update(request, pk):
 @require_POST
 def ticket_delete(request, pk):
     ticket = get_object_or_404(Ticket, pk=pk)
-    if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if ticket.partner != profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+    if not user_can_access_object(request.user, ticket):
+        messages.error(request, 'Unauthorized access.')
+        return redirect('ticket_list')
             
     ticket.soft_delete(request.user)
     messages.success(request, 'Moved to Recycle Bin')

@@ -6,22 +6,18 @@ from django.core.paginator import Paginator
 from django.db.models import Q
 from .models import Lead
 from .forms import LeadForm, AdminLeadForm
-from partners.models import PartnerProfile
+from partners.utils import get_partner_profile, user_can_access_object
 
 @login_required(login_url='/login/')
 def lead_list(request):
     if request.user.is_staff:
-        leads_qs = Lead.objects.all().order_by('-created_at')
+        leads_qs = Lead.objects.select_related('partner', 'partner__user').all().order_by('-created_at')
     else:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.warning(request, "Your account is pending approval.")
-                return redirect('dashboard')
-            leads_qs = Lead.objects.filter(partner=profile).order_by('-created_at')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to view leads.')
-            return redirect('dashboard')
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.warning(request, "Your account is waiting for administrator approval.")
+            return redirect('approval_pending')
+        leads_qs = Lead.objects.select_related('partner', 'partner__user').filter(partner=profile).order_by('-created_at')
 
     # Search and Filter
     search_query = request.GET.get('q', '')
@@ -51,15 +47,12 @@ def lead_list(request):
 
 @login_required(login_url='/login/')
 def lead_create(request):
+    profile = None
     if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if not profile.is_approved:
-                messages.error(request, 'Your account must be approved to add leads.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            messages.error(request, 'Error: You must have a Partner Profile to add leads.')
-            return redirect('dashboard')
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.error(request, 'Your account must be approved to add leads.')
+            return redirect('approval_pending')
 
     form_class = AdminLeadForm if request.user.is_staff else LeadForm
     
@@ -68,7 +61,7 @@ def lead_create(request):
         if form.is_valid():
             lead = form.save(commit=False)
             if not request.user.is_staff:
-                lead.partner = request.user.partner_profile
+                lead.partner = profile
             lead.save()
             messages.success(request, 'Lead successfully added!')
             return redirect('lead_list')
@@ -84,15 +77,12 @@ def lead_update_status(request, lead_id):
         messages.error(request, 'Unauthorized access.')
         return redirect('lead_list')
         
-    try:
-        lead = Lead.objects.get(id=lead_id)
-        new_status = request.POST.get('status')
-        if new_status in dict(Lead.STATUS_CHOICES):
-            lead.status = new_status
-            lead.save()
-            messages.success(request, f'Lead #{lead.id} status updated to {lead.get_status_display()}.')
-    except Lead.DoesNotExist:
-        messages.error(request, 'Lead not found.')
+    lead = get_object_or_404(Lead, id=lead_id)
+    new_status = request.POST.get('status')
+    if new_status in dict(Lead.STATUS_CHOICES):
+        lead.status = new_status
+        lead.save()
+        messages.success(request, f'Lead #{lead.id} status updated to {lead.get_status_display()}.')
             
     return redirect('lead_list')
 
@@ -100,14 +90,9 @@ def lead_update_status(request, lead_id):
 def lead_update(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
     
-    if not request.user.is_staff:
-        try:
-            profile = request.user.partner_profile
-            if lead.partner != profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+    if not user_can_access_object(request.user, lead):
+        messages.error(request, 'Unauthorized access.')
+        return redirect('lead_list')
         
     form_class = AdminLeadForm if request.user.is_staff else LeadForm
     if request.method == 'POST':
@@ -124,13 +109,9 @@ def lead_update(request, pk):
 @require_POST
 def lead_delete(request, pk):
     lead = get_object_or_404(Lead, pk=pk)
-    if not request.user.is_staff:
-        try:
-            if lead.partner != request.user.partner_profile:
-                messages.error(request, 'Unauthorized.')
-                return redirect('dashboard')
-        except PartnerProfile.DoesNotExist:
-            return redirect('dashboard')
+    if not user_can_access_object(request.user, lead):
+        messages.error(request, 'Unauthorized access.')
+        return redirect('lead_list')
             
     lead.soft_delete(request.user)
     messages.success(request, 'Moved to Recycle Bin')

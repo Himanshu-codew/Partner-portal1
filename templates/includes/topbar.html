@@ -123,8 +123,11 @@ document.addEventListener("DOMContentLoaded", function () {
     let loaded       = false;
 
     function csrfToken() {
+        const meta = document.querySelector('meta[name="csrf-token"]');
+        if (meta && meta.content) return meta.content;
         return document.cookie.split('; ').find(r => r.startsWith('csrftoken='))?.split('=')[1] || '';
     }
+
 
     function colorClass(c) {
         const map = { danger:'bg-danger-light', primary:'bg-primary-light', success:'bg-success-light', warning:'bg-warning-light', info:'bg-info-light' };

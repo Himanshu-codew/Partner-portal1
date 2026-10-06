@@ -8,6 +8,7 @@ from django.contrib.auth.models import User
 from django.http import JsonResponse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
+from partners.utils import get_partner_profile
 
 
 def get_soft_deleted_models():
@@ -92,6 +93,17 @@ def hard_delete_item(request, model_name, pk):
     if model_name == 'user':
         from django.contrib.auth.models import User
         user = get_object_or_404(User, pk=pk)
+        if user == request.user:
+            messages.error(request, "You cannot delete your own account.")
+            return redirect(f'/recycle-bin/?tab={model_name}')
+        if user.is_superuser and not request.user.is_superuser:
+            messages.error(request, "Only superusers can delete superuser accounts.")
+            return redirect(f'/recycle-bin/?tab={model_name}')
+        if user.is_superuser and user.is_active:
+            active_superusers = User.objects.filter(is_superuser=True, is_active=True).exclude(pk=user.pk)
+            if not active_superusers.exists():
+                messages.error(request, "The last remaining active superuser cannot be deleted.")
+                return redirect(f'/recycle-bin/?tab={model_name}')
         user.delete()
         messages.success(request, "User permanently deleted.")
         return redirect(f'/recycle-bin/?tab={model_name}')
@@ -111,11 +123,14 @@ def empty_bin(request, model_name):
         raise PermissionDenied
         
     if model_name == 'user':
-        users = User.objects.filter(is_active=False)
+        users = User.objects.filter(is_active=False).exclude(pk=request.user.pk)
+        if not request.user.is_superuser:
+            users = users.exclude(is_superuser=True)
         count = users.count()
         users.delete()
         messages.success(request, f"Permanently deleted {count} Users.")
         return redirect(f'/recycle-bin/?tab={model_name}')
+
         
     models_map = get_soft_deleted_models()
     if model_name in models_map:
@@ -220,10 +235,9 @@ def notifications_feed(request):
 
     else:
         # Partner — scoped to their own data
-        try:
-            profile = user.partner_profile
-        except Exception:
-            return JsonResponse({'notifications': []})
+        profile = get_partner_profile(user)
+        if not profile or not profile.is_approved:
+            return JsonResponse({'notifications': [], 'unread_count': 0})
 
         # Ticket replies / status changes
         for t in Ticket.objects.filter(partner=profile).order_by('-updated_at')[:4]:

@@ -93,7 +93,7 @@
                                     </form>
                                 {% endif %}
                                 <a href="{% url 'ticket_update' ticket.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
-                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#deleteConfirmModal" data-action-url="{% url 'ticket_delete' ticket.pk %}" data-message="Are you sure you want to delete ticket '{{ ticket.subject }}'?" title="Delete"><i class="bi bi-trash"></i></button>
+                                <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'ticket_delete' ticket.pk %}" data-message="Are you sure you want to delete ticket '{{ ticket.subject }}'?" data-title="Delete Ticket" title="Delete"><i class="bi bi-trash"></i></button>
                             </div>
                         </td>
                     </tr>
@@ -144,4 +144,6 @@
     </div>
     {% endif %}
 </div>
+
+{% include 'includes/confirm_modal.html' %}
 {% endblock %}

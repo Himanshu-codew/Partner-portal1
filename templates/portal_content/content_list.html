@@ -92,7 +92,11 @@
                             </small>
                             {% endif %}
                         </div>
-                        <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-outline-success align-self-center"><i class="bi bi-download"></i> Download</a>
+                        {% if doc.file_exists %}
+                        <a href="{% url 'document_download' doc.pk %}" class="btn btn-sm btn-outline-success align-self-center"><i class="bi bi-download"></i> Download</a>
+                        {% else %}
+                        <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1 small align-self-center"><i class="bi bi-exclamation-circle me-1"></i>File missing</span>
+                        {% endif %}
                     </li>
                     {% empty %}
                     <li class="list-group-item text-center py-5 text-muted border-bottom-0">

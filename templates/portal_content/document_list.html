@@ -78,7 +78,7 @@
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
                                 {% if doc.file_exists %}
-                                <a href="{{ doc.file.url }}" target="_blank" class="btn btn-sm btn-white text-dark" data-bs-toggle="tooltip" title="Download" aria-label="Download Document"><i class="bi bi-download"></i></a>
+                                <a href="{% url 'document_download' doc.pk %}" class="btn btn-sm btn-white text-dark" data-bs-toggle="tooltip" title="Download" aria-label="Download Document"><i class="bi bi-download"></i></a>
                                 {% else %}
                                 <span class="badge bg-secondary bg-opacity-10 text-secondary border border-secondary border-opacity-25 rounded-pill px-2 py-1 small" data-bs-toggle="tooltip" title="The file is missing from storage (Render ephemeral disk)"><i class="bi bi-exclamation-circle me-1"></i>File missing</span>
                                 {% endif %}

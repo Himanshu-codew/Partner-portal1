@@ -1,10 +1,19 @@
 {% load core_extras %}
 <ul class="sidebar-nav flex-grow-1 pb-3">
+    {% if request.user.is_staff or request.partner_profile and request.partner_profile.is_approved %}
     <li class="sidebar-item {% if request.path == '/' %}active{% endif %}">
         <a href="{% url 'dashboard' %}" class="sidebar-link">
             <i class="bi bi-speedometer2"></i> Dashboard
         </a>
     </li>
+    {% else %}
+    <li class="sidebar-item {% if request.path == '/approval-pending/' %}active{% endif %}">
+        <a href="{% url 'approval_pending' %}" class="sidebar-link text-warning">
+            <i class="bi bi-hourglass-split"></i> Pending Approval
+        </a>
+    </li>
+    {% endif %}
+
 
     {% if request.user.is_staff %}
         {% if perms.auth.view_group or perms.auth.view_user %}
@@ -104,7 +113,7 @@
             </a>
         </li>
 
-    {% elif request.user.partner_profile and request.user.partner_profile.is_approved %}
+    {% elif request.partner_profile and request.partner_profile.is_approved %}
         <div class="sidebar-section-title">Menu</div>
         <li class="sidebar-item {% if request.path == '/leads/' %}active{% endif %}">
             <a href="{% url 'lead_list' %}" class="sidebar-link">

@@ -1,0 +1,60 @@
+{% extends 'base.html' %}
+
+{% block title %}Account Waiting for Approval | Partner Portal{% endblock %}
+
+{% block content %}
+<div class="row justify-content-center py-5">
+    <div class="col-md-8 col-lg-6">
+        <div class="card shadow-sm border-0 text-center p-4">
+            <div class="card-body">
+                <div class="mb-4">
+                    <div class="bg-warning bg-opacity-10 text-warning rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 80px; height: 80px;">
+                        <i class="bi bi-hourglass-split fs-1"></i>
+                    </div>
+                </div>
+
+                <h3 class="fw-bold mb-2 text-dark">Your account is waiting for approval</h3>
+                <p class="text-muted mb-4">
+                    Thank you for joining our Partner Portal. Your account has been registered and is currently under review by our administration team.
+                    Once approved, you will gain full access to leads, orders, commissions, support tickets, and partner resources.
+                </p>
+
+                <div class="bg-light rounded-3 p-3 text-start mb-4 border">
+                    <div class="row g-2 small">
+                        <div class="col-sm-4 text-muted">Username:</div>
+                        <div class="col-sm-8 fw-semibold text-dark">{{ request.user.username }}</div>
+
+                        <div class="col-sm-4 text-muted">Email:</div>
+                        <div class="col-sm-8 fw-semibold text-dark">{{ request.user.email|default:"Not specified" }}</div>
+
+                        {% if request.partner_profile %}
+                        <div class="col-sm-4 text-muted">Company:</div>
+                        <div class="col-sm-8 fw-semibold text-dark">{{ request.partner_profile.company_name }}</div>
+
+                        <div class="col-sm-4 text-muted">Phone:</div>
+                        <div class="col-sm-8 fw-semibold text-dark">{{ request.partner_profile.phone_number }}</div>
+                        {% endif %}
+
+                        <div class="col-sm-4 text-muted">Status:</div>
+                        <div class="col-sm-8">
+                            <span class="badge bg-warning text-dark"><i class="bi bi-clock me-1"></i>Pending Review</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="d-flex justify-content-center gap-3">
+                    <a href="{% url 'profile' %}" class="btn btn-outline-primary px-4">
+                        <i class="bi bi-person me-1"></i> View Profile
+                    </a>
+                    <form action="{% url 'logout' %}" method="post" class="d-inline mb-0">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-outline-secondary px-4">
+                            <i class="bi bi-box-arrow-right me-1"></i> Log Out
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

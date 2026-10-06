@@ -175,9 +175,13 @@
                     {% for order in page_obj %}
                     <tr>
                         <td class="ps-4">
+                            {% if is_staff %}
                             <a href="{% url 'order_update' order.pk %}" class="fw-bold text-primary text-decoration-none">
                                 #{{ order.order_number }}
                             </a>
+                            {% else %}
+                            <span class="fw-bold text-dark">#{{ order.order_number }}</span>
+                            {% endif %}
                         </td>
                         {% if is_staff %}<td>{{ order.partner.company_name }}</td>{% endif %}
                         <td>₹{{ order.amount|floatformat:2|intcomma }}</td>
@@ -190,11 +194,25 @@
                         </td>
                         {% endif %}
                         <td>
-                            {% if order.is_commission_paid %}
-                                <span class="badge bg-success">Paid</span>
-                            {% else %}
-                                <span class="badge bg-secondary">Pending</span>
-                            {% endif %}
+                            <div class="d-flex align-items-center gap-2">
+                                {% if order.is_commission_paid %}
+                                    <span class="badge bg-success">Paid</span>
+                                    {% if is_staff %}
+                                    <form action="{% url 'order_mark_commission_unpaid' order.pk %}" method="post" class="d-inline mb-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-warning py-0 px-2 small" title="Mark Unpaid">Unmark</button>
+                                    </form>
+                                    {% endif %}
+                                {% else %}
+                                    <span class="badge bg-secondary">Pending</span>
+                                    {% if is_staff %}
+                                    <form action="{% url 'order_mark_commission_paid' order.pk %}" method="post" class="d-inline mb-0">
+                                        {% csrf_token %}
+                                        <button type="submit" class="btn btn-sm btn-outline-success py-0 px-2 small" title="Mark Paid">Mark Paid</button>
+                                    </form>
+                                    {% endif %}
+                                {% endif %}
+                            </div>
                         </td>
                         <td class="text-end pe-4">{{ order.created_at|date:"M d, Y" }}</td>
                     </tr>

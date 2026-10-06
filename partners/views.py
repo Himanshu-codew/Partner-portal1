@@ -8,6 +8,13 @@ from django.core.paginator import Paginator
 from .models import PartnerProfile
 from .forms import UserForm, GroupForm, PartnerProfileForm
 
+def on_partner_approval_changed(profile):
+    """
+    Hook called when a partner's approval status changes.
+    Currently a no-op; reserved for notifications.
+    """
+    pass
+
 @login_required(login_url='/login/')
 def partner_list(request):
     if not request.user.is_staff:
@@ -37,16 +44,13 @@ def partner_approve(request, profile_id):
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
         
-    try:
-        profile = PartnerProfile.objects.get(id=profile_id)
-        is_approved = request.POST.get('is_approved') == 'true'
-        profile.is_approved = is_approved
-        profile.save()
-        status_text = "Approved" if is_approved else "Rejected"
-        messages.success(request, f'Partner {profile.company_name} status updated to {status_text}.')
-    except PartnerProfile.DoesNotExist:
-        messages.error(request, 'Partner not found.')
-            
+    profile = get_object_or_404(PartnerProfile, id=profile_id)
+    is_approved = request.POST.get('is_approved') == 'true'
+    profile.is_approved = is_approved
+    profile.save()
+    on_partner_approval_changed(profile)
+    status_text = "Approved" if is_approved else "Rejected"
+    messages.success(request, f'Partner {profile.company_name} status updated to {status_text}.')
     return redirect('partner_list')
 
 @login_required(login_url='/login/')
@@ -95,13 +99,13 @@ def user_create(request):
         return redirect('dashboard')
         
     if request.method == 'POST':
-        form = UserForm(request.POST)
+        form = UserForm(request.POST, current_user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'User successfully created!')
             return redirect('user_list')
     else:
-        form = UserForm()
+        form = UserForm(current_user=request.user)
     return render(request, 'partners/user_form.html', {'form': form})
 
 @login_required(login_url='/login/')
@@ -167,14 +171,20 @@ def partner_delete(request, pk):
 def user_update(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     u = get_object_or_404(User, pk=pk)
+
+    # Rule 3.2: A non-superuser staff member cannot edit a superuser account
+    if u.is_superuser and not request.user.is_superuser:
+        messages.error(request, "Only superusers can edit superuser accounts.")
+        return redirect('user_list')
+
     if request.method == 'POST':
-        form = UserForm(request.POST, instance=u)
+        form = UserForm(request.POST, instance=u, current_user=request.user)
         if form.is_valid():
             form.save()
             messages.success(request, 'User updated!')
             return redirect('user_list')
     else:
-        form = UserForm(instance=u)
+        form = UserForm(instance=u, current_user=request.user)
     return render(request, 'partners/user_form.html', {'form': form, 'is_update': True})
 
 @login_required(login_url='/login/')
@@ -183,10 +193,22 @@ def user_delete(request, pk):
     if not request.user.is_staff: return redirect('dashboard')
     u = get_object_or_404(User, pk=pk)
     
-    # Prevent deleting yourself
+    # Rule 3.3: Prevent deleting yourself
     if u == request.user:
         messages.error(request, "You cannot delete your own account.")
         return redirect('user_list')
+
+    # Rule 3.2: A non-superuser staff member cannot delete a superuser account
+    if u.is_superuser and not request.user.is_superuser:
+        messages.error(request, "Only superusers can delete superuser accounts.")
+        return redirect('user_list')
+
+    # Rule 3.3: The last remaining active superuser can never be deleted
+    if u.is_superuser and u.is_active:
+        active_superusers = User.objects.filter(is_superuser=True, is_active=True).exclude(pk=u.pk)
+        if not active_superusers.exists():
+            messages.error(request, "The last remaining active superuser cannot be deleted.")
+            return redirect('user_list')
         
     u.is_active = False
     u.save()

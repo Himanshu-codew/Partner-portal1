@@ -41,12 +41,12 @@ def get_notifications_count(context):
         count += Lead.objects.filter(created_at__gt=last_read).count()
         count += Order.objects.filter(created_at__gt=last_read).count()
     else:
-        try:
-            profile = user.partner_profile
+        from partners.utils import get_partner_profile
+        profile = get_partner_profile(user)
+        if profile and profile.is_approved:
             count += Ticket.objects.filter(partner=profile, updated_at__gt=last_read).count()
             count += Lead.objects.filter(partner=profile, created_at__gt=last_read).count()
             count += Order.objects.filter(partner=profile, is_commission_paid=True, created_at__gt=last_read).count()
-        except Exception:
-            pass
+
 
     return min(count, 99)  # cap display

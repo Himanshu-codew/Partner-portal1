@@ -1,6 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
 from partners.models import PartnerProfile
+import re
 
 class PartnerRegistrationForm(forms.ModelForm):
     password = forms.CharField(widget=forms.PasswordInput(attrs={'class': 'form-control', 'placeholder': 'Password'}))
@@ -16,20 +17,29 @@ class PartnerRegistrationForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control', 'placeholder': 'Email Address'}),
         }
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if not email:
+            raise forms.ValidationError("Email address is required.")
+        email = email.strip().lower()
+        if User.objects.filter(email__iexact=email).exists():
+            raise forms.ValidationError("A user with this email address already exists.")
+        return email
+
     def clean_phone_number(self):
         phone = self.cleaned_data.get('phone_number')
-        import re
-        cleaned_number = re.sub(r'[\s\-\+]', '', phone)
+        cleaned_number = re.sub(r'[\s\-\+]', '', phone or '')
         if not cleaned_number.isdigit():
             raise forms.ValidationError("Phone number can only contain digits, spaces, -, or +.")
         if len(cleaned_number) < 10 or len(cleaned_number) > 15:
             raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        if PartnerProfile.objects.filter(phone_number=phone).exists() or PartnerProfile.objects.filter(phone_number=cleaned_number).exists():
+            raise forms.ValidationError("A partner with this phone number already exists.")
         return phone
 
     def clean_company_name(self):
         name = self.cleaned_data.get('company_name')
-        import re
-        if not re.search(r'[a-zA-Z]', name):
+        if not re.search(r'[a-zA-Z]', name or ''):
             raise forms.ValidationError("Company name must contain alphabets.")
         return name
 
@@ -54,18 +64,20 @@ class PartnerProfileUpdateForm(forms.ModelForm):
 
     def clean_phone_number(self):
         phone = self.cleaned_data.get('phone_number')
-        import re
-        cleaned_number = re.sub(r'[\s\-\+]', '', phone)
+        cleaned_number = re.sub(r'[\s\-\+]', '', phone or '')
         if not cleaned_number.isdigit():
             raise forms.ValidationError("Phone number can only contain digits, spaces, -, or +.")
         if len(cleaned_number) < 10 or len(cleaned_number) > 15:
             raise forms.ValidationError("Phone number must be between 10 and 15 digits.")
+        # If changed, check uniqueness without crashing on existing DB duplicates
+        if self.instance and self.instance.pk and self.instance.phone_number != phone:
+            if PartnerProfile.objects.filter(phone_number=phone).exclude(pk=self.instance.pk).exists():
+                raise forms.ValidationError("A partner with this phone number already exists.")
         return phone
 
     def clean_company_name(self):
         name = self.cleaned_data.get('company_name')
-        import re
-        if not re.search(r'[a-zA-Z]', name):
+        if not re.search(r'[a-zA-Z]', name or ''):
             raise forms.ValidationError("Company name must contain alphabets.")
         return name
 
@@ -77,3 +89,12 @@ class UserUpdateForm(forms.ModelForm):
             'email': forms.EmailInput(attrs={'class': 'form-control'}),
         }
 
+    def clean_email(self):
+        email = self.cleaned_data.get('email')
+        if not email:
+            raise forms.ValidationError("Email address is required.")
+        email = email.strip().lower()
+        if self.instance and self.instance.pk and (self.instance.email or '').strip().lower() != email:
+            if User.objects.filter(email__iexact=email).exclude(pk=self.instance.pk).exists():
+                raise forms.ValidationError("A user with this email address already exists.")
+        return email
