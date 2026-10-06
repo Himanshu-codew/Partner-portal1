@@ -28,7 +28,7 @@
     </div>
 </div>
 
-{% if not request.user.is_staff and not request.user.partner_profile.is_approved %}
+{% if not request.user.is_staff and not request.partner_profile.is_approved %}
 <div class="alert alert-warning shadow-sm border-0 mb-4 d-flex align-items-start">
     <i class="bi bi-hourglass-split fs-4 me-3 mt-1"></i>
     <div>
@@ -41,13 +41,13 @@
 
 <!-- Quick Actions -->
 <div class="mb-4 d-flex gap-3 flex-wrap">
-    {% if request.user.is_staff and perms.leads.add_lead or not request.user.is_staff and request.user.partner_profile.is_approved %}
+    {% if request.user.is_staff and perms.leads.add_lead or not request.user.is_staff and request.partner_profile.is_approved %}
     <a href="{% url 'lead_create' %}" class="btn btn-primary shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-plus-lg me-2"></i>Add Lead</a>
     {% endif %}
     {% if request.user.is_staff and perms.orders.add_order %}
     <a href="{% url 'order_create' %}" class="btn btn-success shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-cart-plus me-2"></i>Add Order</a>
     {% endif %}
-    {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff and request.user.partner_profile.is_approved %}
+    {% if request.user.is_staff and perms.support.add_ticket or not request.user.is_staff and request.partner_profile.is_approved %}
     <a href="{% url 'ticket_create' %}" class="btn btn-white shadow-sm px-4 py-2 rounded-3 fw-semibold"><i class="bi bi-headset me-2"></i>Raise Ticket</a>
     {% endif %}
 </div>
