@@ -28,9 +28,9 @@ class UserForm(forms.ModelForm):
         # Rule 3.1: Only superusers may see or change is_superuser and is_staff
         if not (self.current_user and self.current_user.is_superuser):
             if 'is_staff' in self.fields:
-                del self.fields['is_staff']
+                self.fields['is_staff'].disabled = True
             if 'is_superuser' in self.fields:
-                del self.fields['is_superuser']
+                self.fields['is_superuser'].disabled = True
 
     def clean_email(self):
         email = self.cleaned_data.get('email')
