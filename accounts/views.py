@@ -1,5 +1,7 @@
 from django.shortcuts import render, redirect
 from django.contrib.auth.decorators import login_required
+from django.contrib.auth.views import PasswordResetView
+from django.core.cache import cache
 from django.db.models import Sum, Count, Q
 from django.db.models.functions import TruncMonth, TruncDay
 from django.contrib import messages
@@ -320,3 +322,50 @@ def profile_edit(request):
         'p_form': p_form,
     }
     return render(request, 'profile_edit.html', context)
+
+
+# -----------------------------------------------------------------
+# Password reset request (rate-limited)
+# -----------------------------------------------------------------
+
+PASSWORD_RESET_LIMIT = 5          # requests per IP ...
+PASSWORD_RESET_WINDOW = 60 * 60   # ... per hour
+
+
+def get_client_ip(request):
+    forwarded = request.META.get('HTTP_X_FORWARDED_FOR', '')
+    if forwarded:
+        return forwarded.split(',')[0].strip()
+    return request.META.get('REMOTE_ADDR', 'unknown')
+
+
+class PasswordResetRequestView(PasswordResetView):
+    """Password reset request form, throttled to 5 requests per IP per hour.
+
+    Kept friendly on purpose: the underlying PasswordResetView already uses
+    the same "done" page for known and unknown addresses, so no account
+    enumeration is possible here either.
+    """
+
+    template_name = 'registration/password_reset_form.html'
+    email_template_name = 'registration/password_reset_email.txt'
+    html_email_template_name = 'registration/password_reset_email.html'
+    subject_template_name = 'registration/password_reset_subject.txt'
+
+    def post(self, request, *args, **kwargs):
+        cache_key = 'password-reset:{}'.format(get_client_ip(request))
+        cache.add(cache_key, 0, PASSWORD_RESET_WINDOW)
+        try:
+            attempts = cache.incr(cache_key)
+        except ValueError:  # key expired between add and incr
+            cache.set(cache_key, 1, PASSWORD_RESET_WINDOW)
+            attempts = 1
+
+        if attempts > PASSWORD_RESET_LIMIT:
+            messages.warning(
+                request,
+                'Too many password reset requests. Please wait about an hour before trying again.'
+            )
+            return self.get(request, *args, **kwargs)
+
+        return super().post(request, *args, **kwargs)

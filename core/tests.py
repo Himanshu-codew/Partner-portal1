@@ -13,12 +13,22 @@ Run with:
     python manage.py test core.tests --verbosity=2
 """
 
+import io
+import json
+import re
 import tempfile
+import urllib.error
+from unittest import mock
 
-from django.test import TestCase, Client
+from django.test import TestCase, Client, override_settings
 from django.contrib.auth.models import User
 from django.urls import reverse
+from django.core import mail
+from django.core.cache import cache
+from django.core.exceptions import ImproperlyConfigured
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.core.management import call_command
+from django.core.management.base import CommandError
 
 from partners.models import PartnerProfile
 from leads.models import Lead
@@ -713,3 +723,206 @@ class DocumentDatabaseStorageTests(BaseTestCase):
         list_resp = self.client.get(reverse('document_list'))
         self.assertEqual(list_resp.status_code, 200)
         self.assertContains(list_resp, 'File missing')
+
+
+# =================================================================
+# PHASE 1B  PASSWORD RESET BY EMAIL
+# =================================================================
+
+class PasswordResetTests(BaseTestCase):
+    """Anonymous reset flow: pages, throttling, email delivery, pending partners."""
+
+    def setUp(self):
+        super().setUp()
+        cache.clear()
+
+    def test_request_page_get_returns_200(self):
+        resp = self.client.get(reverse('password_reset'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Forgot Password')
+        self.assertContains(resp, 'name="email"')
+
+    def test_login_page_has_forgot_password_link(self):
+        resp = self.client.get(reverse('login'))
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Forgot password?')
+
+    def test_known_email_sends_one_working_reset_link(self):
+        resp = self.client.post(reverse('password_reset'), {'email': 'p1@test.com'})
+        self.assertRedirects(resp, reverse('password_reset_done'))
+        self.assertEqual(len(mail.outbox), 1)
+
+        message = mail.outbox[0]
+        self.assertEqual(message.to, ['p1@test.com'])
+        self.assertTrue(
+            any(mimetype == 'text/html' for _, mimetype in message.alternatives),
+            'reset email must carry an HTML alternative',
+        )
+
+        match = re.search(r'https?://[^/\s]+/reset/[^/\s]+/[^/\s]+', message.body)
+        self.assertIsNotNone(match, 'reset link missing from the email body')
+        link = match.group(0)
+
+        # Open the link and choose a new password
+        resp = self.client.get(link, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        action_path = resp.request['PATH_INFO']
+        resp = self.client.post(action_path, {
+            'new_password1': 'Fresh@Pass1234',
+            'new_password2': 'Fresh@Pass1234',
+        }, follow=True)
+        self.assertEqual(resp.status_code, 200)
+        self.assertContains(resp, 'Password Changed')
+
+        # Old password stopped working, new one works
+        self.assertFalse(self.client.login(username='partner1', password='pass1234'))
+        self.assertTrue(self.client.login(username='partner1', password='Fresh@Pass1234'))
+
+    def test_unknown_email_uses_same_done_page_and_sends_nothing(self):
+        resp = self.client.post(reverse('password_reset'), {'email': 'nobody@example.com'})
+        self.assertRedirects(resp, reverse('password_reset_done'))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_inactive_user_gets_no_email(self):
+        self.partner_user.is_active = False
+        self.partner_user.save()
+        resp = self.client.post(reverse('password_reset'), {'email': 'p1@test.com'})
+        self.assertRedirects(resp, reverse('password_reset_done'))
+        self.assertEqual(len(mail.outbox), 0)
+
+    def test_throttled_after_five_requests_from_same_ip(self):
+        for _ in range(5):
+            self.client.post(reverse('password_reset'), {'email': 'p1@test.com'})
+        self.assertEqual(len(mail.outbox), 5)
+
+        resp = self.client.post(reverse('password_reset'), {'email': 'p1@test.com'})
+        self.assertEqual(resp.status_code, 200)  # stayed on the form
+        self.assertContains(resp, 'Too many password reset requests')
+        self.assertEqual(len(mail.outbox), 5)
+
+    def test_pending_partner_can_open_reset_pages(self):
+        self.login_as(self.unapproved_user)
+        for url_name in ['password_reset', 'password_reset_done', 'password_reset_complete']:
+            with self.subTest(url=url_name):
+                resp = self.client.get(reverse(url_name))
+                self.assertEqual(resp.status_code, 200)
+
+    def test_change_password_page_still_works_for_pending_partner(self):
+        self.login_as(self.unapproved_user)
+        resp = self.client.get(reverse('password_change'))
+        self.assertEqual(resp.status_code, 200)
+
+        resp = self.client.post(reverse('password_change'), {
+            'old_password': 'pass1234',
+            'new_password1': 'Changed@Pass1234',
+            'new_password2': 'Changed@Pass1234',
+        })
+        self.assertEqual(resp.status_code, 302)
+        self.assertTrue(self.client.login(username='unapproved', password='Changed@Pass1234'))
+
+
+# =================================================================
+# PHASE 1B  BREVO HTTPS API EMAIL BACKEND
+# =================================================================
+
+class BrevoEmailBackendTests(TestCase):
+    """BrevoAPIEmailBackend posts JSON to Brevo without ever leaking the key."""
+
+    API_KEY = 'brevo-test-key-not-real'
+
+    def _message(self):
+        from django.core.mail import EmailMultiAlternatives
+        message = EmailMultiAlternatives(
+            subject='Reset your Partner Portal password',
+            body='Plain text version of the message.',
+            from_email='Partner Portal <no-reply@example.com>',
+            to=['recipient@example.com'],
+        )
+        message.attach_alternative('<p>HTML version of the message.</p>', 'text/html')
+        return message
+
+    @override_settings(BREVO_API_KEY='brevo-test-key-not-real')
+    def test_posts_json_with_expected_headers_and_payload(self):
+        from core import email_backends
+
+        mocked_response = mock.MagicMock()
+        mocked_response.__enter__.return_value.read.return_value = b'{"message": "accepted"}'
+        mocked_response.__enter__.return_value.getcode.return_value = 201
+
+        with mock.patch.object(
+            email_backends.urllib.request, 'urlopen', return_value=mocked_response
+        ) as urlopen:
+            sent = email_backends.BrevoAPIEmailBackend().send_messages([self._message()])
+
+        self.assertEqual(sent, 1)
+        request = urlopen.call_args[0][0]
+        self.assertEqual(request.get_header('Api-key'), self.API_KEY)
+        self.assertEqual(request.get_header('Accept'), 'application/json')
+        self.assertEqual(request.get_header('Content-type'), 'application/json')
+        self.assertEqual(urlopen.call_args[1].get('timeout'), 10)
+
+        payload = json.loads(request.data.decode('utf-8'))
+        self.assertEqual(payload['sender'], {'name': 'Partner Portal', 'email': 'no-reply@example.com'})
+        self.assertEqual(payload['to'], [{'email': 'recipient@example.com'}])
+        self.assertEqual(payload['subject'], 'Reset your Partner Portal password')
+        self.assertEqual(payload['textContent'], 'Plain text version of the message.')
+        self.assertEqual(payload['htmlContent'], '<p>HTML version of the message.</p>')
+
+    @override_settings(BREVO_API_KEY='brevo-test-key-not-real')
+    def test_http_error_logs_without_key_and_raises(self):
+        from core import email_backends
+
+        error = urllib.error.HTTPError(
+            email_backends.BREVO_API_URL, 401, 'Unauthorized', {},
+            io.BytesIO(b'{"code":401,"message":"Access denied, invalid key provided"}'),
+        )
+        with mock.patch.object(email_backends.urllib.request, 'urlopen', side_effect=error):
+            with self.assertLogs('core.email_backends', level='ERROR') as captured:
+                with self.assertRaises(urllib.error.HTTPError):
+                    email_backends.BrevoAPIEmailBackend().send_messages([self._message()])
+
+        output = '\n'.join(captured.output)
+        self.assertIn('401', output)
+        self.assertIn('Access denied', output)
+        self.assertNotIn(self.API_KEY, output)
+
+    @override_settings(BREVO_API_KEY='brevo-test-key-not-real')
+    def test_network_error_fail_silently_returns_zero(self):
+        from core import email_backends
+
+        with mock.patch.object(
+            email_backends.urllib.request, 'urlopen', side_effect=OSError('network unreachable')
+        ):
+            sent = email_backends.BrevoAPIEmailBackend(fail_silently=True).send_messages([self._message()])
+        self.assertEqual(sent, 0)
+
+    @override_settings(BREVO_API_KEY='')
+    def test_missing_api_key_raises(self):
+        from core import email_backends
+
+        with self.assertRaises(ImproperlyConfigured):
+            email_backends.BrevoAPIEmailBackend().send_messages([self._message()])
+
+    def test_send_test_email_command_sends(self):
+        out = io.StringIO()
+        with override_settings(EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend'):
+            call_command('send_test_email', 'someone@example.com', stdout=out)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['someone@example.com'])
+        self.assertIn('Success', out.getvalue())
+
+    @override_settings(
+        EMAIL_BACKEND='core.email_backends.BrevoAPIEmailBackend',
+        BREVO_API_KEY='brevo-test-key-not-real',
+    )
+    def test_send_test_email_command_reports_errors_without_key(self):
+        from core import email_backends
+
+        error = urllib.error.HTTPError(
+            email_backends.BREVO_API_URL, 401, 'Unauthorized', {},
+            io.BytesIO(b'{"message":"Access denied"}'),
+        )
+        with mock.patch.object(email_backends.urllib.request, 'urlopen', side_effect=error):
+            with self.assertRaises(CommandError) as ctx:
+                call_command('send_test_email', 'someone@example.com', stdout=io.StringIO())
+        self.assertNotIn(self.API_KEY, str(ctx.exception))

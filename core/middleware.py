@@ -30,6 +30,10 @@ class PartnerApprovalMiddleware:
                 
                 # Build allowed prefixes
                 allowed_prefixes = ['/static/', '/media/']
+                # Password reset pages must stay reachable while waiting for
+                # approval (matched as prefixes because the confirm URL carries
+                # uid/token arguments).
+                allowed_prefixes += ['/password-reset/', '/reset/']
                 for view_name in ['logout', 'profile', 'profile_edit', 'password_change', 'approval_pending']:
                     try:
                         allowed_prefixes.append(reverse(view_name))
