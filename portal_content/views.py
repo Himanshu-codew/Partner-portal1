@@ -164,7 +164,14 @@ def document_download(request, pk):
         
         file_handle = doc.file.open('rb')
         filename = os.path.basename(doc.file.name)
-        return FileResponse(file_handle, as_attachment=True, filename=filename)
+        # Prefer the MIME type recorded by the storage (None -> guessed from filename)
+        get_content_type = getattr(doc.file.storage, 'get_content_type', None)
+        content_type = None
+        if callable(get_content_type):
+            content_type = get_content_type(doc.file.name) or None
+        return FileResponse(
+            file_handle, as_attachment=True, filename=filename, content_type=content_type
+        )
     except (FileNotFoundError, OSError, ValueError):
         messages.error(request, "File missing from storage.")
         return redirect('document_list')

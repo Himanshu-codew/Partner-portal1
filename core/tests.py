@@ -644,3 +644,72 @@ class GetPartnerProfileTests(TestCase):
             user=user, company_name='Test Co', phone_number='9000000002'
         )
         self.assertEqual(get_partner_profile(user), profile)
+
+
+# =================================================================
+# PHASE 1A  DOCUMENTS STORED IN THE DATABASE
+# =================================================================
+
+class DocumentDatabaseStorageTests(BaseTestCase):
+    """Uploads are kept in core.models.StoredFile (DatabaseFileStorage)."""
+
+    PDF_BYTES = b'%PDF-1.4 stored in the database'
+
+    def _make_doc(self, name='stored_doc.pdf', visible_to=None):
+        doc = Document.objects.create(
+            title='Stored Doc',
+            file=SimpleUploadedFile(name, self.PDF_BYTES, content_type='application/pdf'),
+        )
+        if visible_to:
+            doc.visible_to.set(visible_to)
+        return doc
+
+    def test_upload_then_download_works_for_approved_partner(self):
+        doc = self._make_doc()
+        self.login_as(self.partner_user)
+        resp = self.client.get(reverse('document_download', args=[doc.pk]))
+        self.assertEqual(resp.status_code, 200)
+        self.assertEqual(b''.join(resp.streaming_content), self.PDF_BYTES)
+        self.assertIn('application/pdf', resp['Content-Type'])
+        self.assertIn('stored_doc.pdf', resp['Content-Disposition'])
+        from core.models import StoredFile
+        self.assertTrue(StoredFile.objects.filter(name=doc.file.name).exists())
+
+    def test_anonymous_user_is_redirected_to_login(self):
+        doc = self._make_doc()
+        self.client.logout()
+        resp = self.client.get(reverse('document_download', args=[doc.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertIn('login', resp['Location'])
+
+    def test_partner_not_in_visible_to_cannot_download(self):
+        doc = self._make_doc(visible_to=[self.partner_profile])
+        self.login_as(self.partner_user2)
+        resp = self.client.get(reverse('document_download', args=[doc.pk]))
+        self.assertEqual(resp.status_code, 302)
+        self.assertNotEqual(resp.status_code, 200)
+
+    def test_soft_delete_keeps_bytes_and_permanent_delete_removes_them(self):
+        from core.models import StoredFile
+        doc = self._make_doc()
+        name = doc.file.name
+        self.assertTrue(StoredFile.objects.filter(name=name).exists())
+
+        doc.soft_delete(self.staff)
+        self.assertTrue(StoredFile.objects.filter(name=name).exists())
+
+        doc.hard_delete()
+        self.assertFalse(StoredFile.objects.filter(name=name).exists())
+
+    def test_missing_stored_bytes_do_not_cause_500(self):
+        doc = Document.objects.create(
+            title='Lost Doc', file='documents/lost_doc.pdf'
+        )
+        self.login_as(self.partner_user)
+        resp = self.client.get(reverse('document_download', args=[doc.pk]))
+        self.assertNotEqual(resp.status_code, 500)
+        self.assertEqual(resp.status_code, 302)
+
+        list_resp = self.client.get(reverse('document_list'))
+        self.assertEqual(list_resp.status_code, 200)
+        self.assertContains(list_resp, 'File missing')

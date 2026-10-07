@@ -11,6 +11,19 @@ class UserNotificationRead(models.Model):
     def __str__(self):
         return f"{self.user.username} last read at {self.last_read_at}"
 
+
+class StoredFile(models.Model):
+    """A file's bytes, kept in the database so uploads survive redeploys."""
+    name = models.CharField(max_length=255, unique=True)
+    content = models.BinaryField()
+    content_type = models.CharField(max_length=255, blank=True, default='')
+    size = models.PositiveIntegerField(default=0)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return self.name
+
+
 class SoftDeleteQuerySet(models.QuerySet):
     def delete(self, user=None):
         return super().update(is_deleted=True, deleted_at=timezone.now(), deleted_by=user)

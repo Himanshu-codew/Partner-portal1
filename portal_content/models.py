@@ -1,6 +1,9 @@
 import os
 from core.models import SoftDeleteModel
+from core.storage import DatabaseFileStorage
 from django.db import models
+from django.db.models.signals import post_delete
+from django.dispatch import receiver
 
 class Announcement(SoftDeleteModel):
     title = models.CharField(max_length=200)
@@ -20,7 +23,7 @@ class Announcement(SoftDeleteModel):
 
 class Document(SoftDeleteModel):
     title = models.CharField(max_length=200)
-    file = models.FileField(upload_to='documents/')
+    file = models.FileField(upload_to='documents/', storage=DatabaseFileStorage)
     uploaded_at = models.DateTimeField(auto_now_add=True)
     # If empty → visible to ALL approved partners. If set → only selected partners.
     visible_to = models.ManyToManyField(
@@ -71,3 +74,17 @@ class Document(SoftDeleteModel):
                 return f'{size / 1024 ** 3:.2f} GB'
         except (FileNotFoundError, ValueError, OSError):
             return '\u2014'
+
+
+@receiver(post_delete, sender=Document)
+def delete_document_file_bytes(sender, instance, **kwargs):
+    """
+    Drop the stored bytes when a Document row is permanently deleted.
+
+    Soft deletes never send this signal, so the bytes survive them and are
+    only removed on hard delete (recycle bin -> Delete Forever / Empty Bin).
+    """
+    try:
+        instance.file.delete(save=False)
+    except Exception:
+        pass
