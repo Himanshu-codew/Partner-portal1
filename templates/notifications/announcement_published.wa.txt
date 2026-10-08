@@ -1,0 +1,1 @@
+Partner Portal: new announcement "{{ announcement.title|truncatechars:60 }}". Open: {{ site_url }}/resources/announcements/

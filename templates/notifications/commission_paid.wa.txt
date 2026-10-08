@@ -1,0 +1,1 @@
+Partner Portal: commission for order {{ order.order_number }} has been paid. Open: {{ site_url }}/orders/commission/

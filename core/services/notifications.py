@@ -1,9 +1,9 @@
-"""Notification service (Phase 2A).
+"""Notification service (Phase 2A/2B).
 
 Fan-out of portal events (ticket replies, status changes, announcements…)
 to the channels a user allows. Emails go through Django's configured
-email backend (Brevo HTTPS API in production); WhatsApp is prepared but
-still a stub until a provider is wired up.
+email backend (Brevo HTTPS API in production); WhatsApp goes through the
+Twilio WhatsApp sandbox (``core.services.whatsapp``).
 
 Design rules:
   * ``notify()`` never raises — delivery problems are logged, and every
@@ -11,7 +11,9 @@ Design rules:
   * Delivery runs inside ``transaction.on_commit`` so nothing escapes a
     transaction that later rolls back.
   * Identical events are deduplicated for a short window, and the daily
-    email volume is capped by ``settings.NOTIFY_EMAIL_DAILY_LIMIT``.
+    volume of each channel is capped (``NOTIFY_EMAIL_DAILY_LIMIT`` /
+    ``NOTIFY_WHATSAPP_DAILY_LIMIT``).
+  * A failing channel can never take another channel down with it.
 """
 
 import hashlib
@@ -28,6 +30,8 @@ from django.template.loader import render_to_string
 from django.utils import timezone
 
 from core.models import NotificationLog
+from core.utils import normalize_phone
+from core.services.whatsapp import get_provider
 from partners.utils import get_partner_profile
 
 logger = logging.getLogger('core.notifications')
@@ -45,7 +49,8 @@ EVENTS = {
 CHANNELS = ('email', 'whatsapp')
 
 DEDUPE_TTL = 60           # seconds an identical event is suppressed for
-QUOTA_TTL = 60 * 60 * 24  # lifetime of the daily email counter
+QUOTA_TTL = 60 * 60 * 24  # lifetime of the daily channel counters
+MAX_WA_BODY = 400         # characters — WhatsApp texts stay short
 
 
 @dataclass
@@ -54,6 +59,8 @@ class ChannelResult:
 
     status: str
     error: str = ''
+    # Provider receipt (Twilio SID) when an external provider delivered it.
+    provider_message_id: str = ''
 
     def __str__(self):
         return self.status if not self.error else f'{self.status}: {self.error}'
@@ -61,9 +68,12 @@ class ChannelResult:
 
 def _redact(text):
     """Strip configured secrets from a string before it is recorded."""
+    text = str(text)
     for secret in (
         getattr(settings, 'BREVO_API_KEY', ''),
         getattr(settings, 'EMAIL_HOST_PASSWORD', ''),
+        getattr(settings, 'TWILIO_AUTH_TOKEN', ''),
+        getattr(settings, 'TWILIO_ACCOUNT_SID', ''),
     ):
         if secret and secret in text:
             text = text.replace(secret, '[redacted]')
@@ -110,6 +120,26 @@ def _email_quota_available():
 
 def _bump_email_quota():
     key = _quota_key()
+    cache.add(key, 0, QUOTA_TTL)
+    try:
+        cache.incr(key)
+    except ValueError:
+        cache.set(key, 1, QUOTA_TTL)
+
+
+def _whatsapp_quota_key():
+    return f'notify:whatsapp-count:{timezone.localdate().isoformat()}'
+
+
+def _whatsapp_quota_available():
+    limit = getattr(settings, 'NOTIFY_WHATSAPP_DAILY_LIMIT', 50)
+    if limit <= 0:
+        return True
+    return int(cache.get(_whatsapp_quota_key(), 0)) < limit
+
+
+def _bump_whatsapp_quota():
+    key = _whatsapp_quota_key()
     cache.add(key, 0, QUOTA_TTL)
     try:
         cache.incr(key)
@@ -164,10 +194,11 @@ class EmailChannel:
 
 class WhatsAppChannel:
     """
-    Prepared but not wired to a provider yet.
+    Outbound WhatsApp text through the Twilio sandbox (Phase 2B).
 
-    Kept in the pipeline so consent rules, logging and tests are real:
-    it reports why a message was not sent instead of pretending to send.
+    Every skip reason is reported instead of pretending to send, and a
+    provider problem is returned as a ``failed`` result — never raised —
+    so the email channel and the request are unaffected.
     """
 
     name = NotificationLog.CHANNEL_WHATSAPP
@@ -178,11 +209,53 @@ class WhatsAppChannel:
         profile = get_partner_profile(user)
         if profile is None:
             return ChannelResult('skipped', 'no whatsapp profile')
+        if not profile.is_approved:
+            return ChannelResult('skipped', 'partner not approved')
         if not profile.whatsapp_opt_in or not profile.notify_whatsapp:
             return ChannelResult('skipped', 'whatsapp notifications disabled')
         if not profile.whatsapp_number:
             return ChannelResult('skipped', 'missing whatsapp number')
-        return ChannelResult('skipped', 'not implemented')
+        try:
+            number = normalize_phone(profile.whatsapp_number)
+        except Exception:  # noqa: BLE001 - invalid stored number
+            return ChannelResult('skipped', 'invalid whatsapp number')
+
+        provider = get_provider()
+        if provider is None:
+            return ChannelResult('skipped', 'not configured')
+
+        allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
+        if allowed and number not in allowed:
+            return ChannelResult('skipped', 'number not in allowed list')
+        if not _whatsapp_quota_available():
+            return ChannelResult('skipped', 'daily whatsapp limit reached')
+
+        body = self._build_body(context)
+        if not body:
+            return ChannelResult('failed', 'missing whatsapp template')
+
+        result = provider.send_text(number, body)
+        if not result.ok:
+            error = (
+                f'twilio {result.error_code}: {result.error_message}'
+                if result.error_code else result.error_message
+            )
+            return ChannelResult('failed', error or 'send failed')
+
+        _bump_whatsapp_quota()
+        return ChannelResult('sent', provider_message_id=result.message_id)
+
+    @staticmethod
+    def _build_body(context):
+        """Render the short plain text for this event (max 400 chars)."""
+        template = f'notifications/{context["event"]}.wa.txt'
+        try:
+            body = render_to_string(template, context).strip()
+        except TemplateDoesNotExist:
+            return ''
+        if len(body) > MAX_WA_BODY:
+            body = body[:MAX_WA_BODY - 3].rstrip() + '...'
+        return body
 
 
 def _preflight(user, event, context):
@@ -252,7 +325,8 @@ def _deliver(user, event, context, dedupe_key):
                 event=event,
                 channel=channel.name,
                 status=result.status,
-                error=result.error[:200],
+                error=_redact(result.error)[:200],
+                provider_message_id=(result.provider_message_id or '')[:100],
             )
             logger.info('notification %s via %s: %s', event, channel.name, result)
     except Exception as exc:  # noqa: BLE001 - notify must never raise

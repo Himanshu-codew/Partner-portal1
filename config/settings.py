@@ -217,9 +217,25 @@ if not SITE_URL:
 # Upper bound on notification emails sent per user-facing day.
 NOTIFY_EMAIL_DAILY_LIMIT = int(os.environ.get('NOTIFY_EMAIL_DAILY_LIMIT', '200'))
 
-# WhatsApp delivery is prepared but not wired to a provider yet; the
-# channel stays disabled until a provider and credentials are chosen.
+# WhatsApp delivery (Phase 2B): outbound text only, through the Twilio
+# WhatsApp sandbox. The channel stays disabled until WHATSAPP_ENABLED is
+# turned on and the Twilio settings below are provided.
 WHATSAPP_ENABLED = os.environ.get('WHATSAPP_ENABLED', 'False').lower() in ('true', '1', 't', 'yes')
+WHATSAPP_PROVIDER = os.environ.get('WHATSAPP_PROVIDER', 'twilio').strip() or 'twilio'
+TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '').strip()
+TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
+TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '').strip()
+
+# Optional comma-separated list of E.164 destinations. When set, these
+# are the ONLY numbers ever sent to — protects the sandbox free quota.
+WHATSAPP_ALLOWED_NUMBERS = [
+    number.strip()
+    for number in os.environ.get('WHATSAPP_ALLOWED_NUMBERS', '').split(',')
+    if number.strip()
+]
+
+# Upper bound on WhatsApp messages sent per day (<= 0 means unlimited).
+NOTIFY_WHATSAPP_DAILY_LIMIT = int(os.environ.get('NOTIFY_WHATSAPP_DAILY_LIMIT', '50'))
 
 
 # ─────────────────────────────────────────────────────────────

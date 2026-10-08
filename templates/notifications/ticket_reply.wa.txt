@@ -1,0 +1,1 @@
+Partner Portal: new reply on your ticket #{{ ticket.pk }} ({{ ticket.subject|truncatechars:60 }}). Open: {{ site_url }}/support/{{ ticket.pk }}/

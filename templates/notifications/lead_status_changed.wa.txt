@@ -1,0 +1,1 @@
+Partner Portal: your lead #{{ lead.pk }} ({{ lead.customer_name|truncatechars:40 }}) is now {{ lead.get_status_display }}. Open: {{ site_url }}/leads/

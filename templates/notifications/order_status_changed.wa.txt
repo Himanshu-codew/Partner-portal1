@@ -1,0 +1,1 @@
+Partner Portal: order {{ order.order_number }} is now {{ order.get_status_display }}. Open: {{ site_url }}/orders/

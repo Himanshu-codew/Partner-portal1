@@ -50,6 +50,9 @@ class NotificationLog(models.Model):
     status = models.CharField(max_length=10, choices=STATUS_CHOICES)
     # Short, redacted reason — never store raw exception payloads here.
     error = models.CharField(max_length=200, blank=True, default='')
+    # Provider receipt for this message (Twilio message SID) when the
+    # channel delivered through an external provider.
+    provider_message_id = models.CharField(max_length=100, blank=True, default='')
     created_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:

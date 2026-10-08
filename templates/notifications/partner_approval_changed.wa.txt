@@ -1,0 +1,1 @@
+{% if profile.is_approved %}Partner Portal: your partner account for "{{ profile.company_name|truncatechars:40 }}" has been approved. Open: {{ site_url }}/{% else %}Partner Portal: your partner account for "{{ profile.company_name|truncatechars:40 }}" was not approved. Please contact us with any questions.{% endif %}

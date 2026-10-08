@@ -147,6 +147,7 @@ class TicketReplyThreadTests(BaseTestCase):
         self.assertEqual(len(mail.outbox), 0)
         self.assertEqual(NotificationLog.objects.count(), 0)
 
+    @override_settings(WHATSAPP_ENABLED=False)
     def test_staff_reply_notifies_partner(self):
         self.login_as(self.staff)
         with self.captureOnCommitCallbacks(execute=True):
@@ -349,6 +350,7 @@ class NotificationServiceTests(BaseTestCase):
         self.assertEqual(str(ChannelResult('sent')), 'sent')
         self.assertEqual(str(ChannelResult('failed', 'boom')), 'failed: boom')
 
+    @override_settings(WHATSAPP_ENABLED=False)
     def test_delivers_email_and_logs_both_channels(self):
         with self.captureOnCommitCallbacks(execute=True):
             result = notify(
@@ -457,8 +459,9 @@ class NotificationServiceTests(BaseTestCase):
         self.assertEqual(logs[1].status, 'skipped')
         self.assertEqual(logs[1].error, 'daily email limit reached')
 
-    @override_settings(WHATSAPP_ENABLED=True)
-    def test_whatsapp_enabled_but_not_wired(self):
+    @override_settings(WHATSAPP_ENABLED=True, TWILIO_ACCOUNT_SID='',
+                       TWILIO_AUTH_TOKEN='', TWILIO_WHATSAPP_FROM='')
+    def test_whatsapp_enabled_but_settings_missing(self):
         self.partner_profile.whatsapp_opt_in = True
         self.partner_profile.whatsapp_opt_in_at = timezone.now()
         self.partner_profile.whatsapp_number = '+919876543210'
@@ -470,7 +473,7 @@ class NotificationServiceTests(BaseTestCase):
                    {'ticket': self.ticket, 'reply': self.reply, 'actor': self.staff})
         log = NotificationLog.objects.get(channel='whatsapp')
         self.assertEqual(log.status, 'skipped')
-        self.assertEqual(log.error, 'not implemented')
+        self.assertEqual(log.error, 'not configured')
 
     @override_settings(WHATSAPP_ENABLED=True)
     def test_whatsapp_respects_consent(self):
