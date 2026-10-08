@@ -7,13 +7,15 @@ from django.db.models import Q
 from django.core.paginator import Paginator
 from .models import PartnerProfile
 from .forms import UserForm, GroupForm, PartnerProfileForm
+from core.services import notify
 
 def on_partner_approval_changed(profile):
     """
     Hook called when a partner's approval status changes.
-    Currently a no-op; reserved for notifications.
+    Notifies the partner when their account has been approved.
     """
-    pass
+    if profile.is_approved and profile.user_id:
+        notify(profile.user, 'partner_approval_changed', {'profile': profile})
 
 @login_required(login_url='/login/')
 def partner_list(request):

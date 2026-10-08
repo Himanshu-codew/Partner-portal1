@@ -1,0 +1,11 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+The support team replied to your ticket #{{ ticket.pk }} ("{{ ticket.subject }}"):
+
+{{ reply.message }}
+
+Open the conversation:
+{{ site_url }}/support/{{ ticket.pk }}/
+
+--
+Partner Portal

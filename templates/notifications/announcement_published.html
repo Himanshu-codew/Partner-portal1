@@ -1,0 +1,10 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#334155;line-height:1.5;">
+  <p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+  <p><strong>New announcement: &ldquo;{{ announcement.title }}&rdquo;</strong></p>
+  <div style="background:#f8fafc;border-left:3px solid #f59e0b;padding:12px;white-space:pre-wrap;">{{ announcement.content|truncatewords:60 }}</div>
+  <p><a href="{{ site_url }}/resources/announcements/" style="color:#2563eb;">Read it here</a></p>
+  <p style="color:#64748b;font-size:12px;">&mdash; Partner Portal</p>
+</body>
+</html>

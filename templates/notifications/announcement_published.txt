@@ -1,0 +1,10 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+New announcement: "{{ announcement.title }}"
+
+{{ announcement.content|truncatewords:60 }}
+
+Read it here: {{ site_url }}/resources/announcements/
+
+--
+Partner Portal

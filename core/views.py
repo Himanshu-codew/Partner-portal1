@@ -155,13 +155,13 @@ def _humanize_time(dt):
 @login_required(login_url='/login/')
 def notifications_feed(request):
     """Return latest 10 notifications as JSON, scoped by role."""
-    from support.models import Ticket
+    from support.models import Ticket, TicketReply
     from leads.models import Lead
     from orders.models import Order
     from partners.models import PartnerProfile
     from portal_content.models import Announcement
     from core.models import UserNotificationRead
-    from django.db.models import Count
+    from django.db.models import Count, Q
 
     user = request.user
 
@@ -233,22 +233,43 @@ def notifications_feed(request):
                 'unread': o.created_at > last_read,
             })
 
+        # Partner replies on tickets (last 7 days)
+        recent_replies = TicketReply.objects.filter(
+            author__is_staff=False,
+            created_at__gte=timezone.now() - timezone.timedelta(days=7),
+            ticket__is_deleted=False,
+        ).select_related('ticket', 'author').order_by('-created_at')[:3]
+        for r in recent_replies:
+            who = r.author.username if r.author else 'partner'
+            notifications.append({
+                'icon': 'bi-reply-fill',
+                'color': 'info',
+                'title': r.ticket.subject,
+                'msg': f"Reply from {who} — {r.ticket.get_status_display()}",
+                'time': _humanize_time(r.created_at),
+                'url': f'/support/{r.ticket.pk}/',
+                'unread': r.created_at > last_read,
+            })
+
     else:
         # Partner — scoped to their own data
         profile = get_partner_profile(user)
         if not profile or not profile.is_approved:
             return JsonResponse({'notifications': [], 'unread_count': 0})
 
-        # Ticket replies / status changes
+        # Ticket replies from the support team (legacy admin_reply counts too)
         for t in Ticket.objects.filter(partner=profile).order_by('-updated_at')[:4]:
-            if t.admin_reply:
+            support_replies = t.replies.filter(
+                Q(author__isnull=True) | Q(author__is_staff=True)
+            )
+            if t.admin_reply or support_replies.exists():
                 notifications.append({
                     'icon': 'bi-headset',
                     'color': 'info',
                     'title': t.subject,
                     'msg': f"Admin replied — {t.get_status_display()}",
                     'time': _humanize_time(t.updated_at),
-                    'url': '/support/',
+                    'url': f'/support/{t.pk}/',
                     'unread': t.updated_at > last_read,
                 })
 

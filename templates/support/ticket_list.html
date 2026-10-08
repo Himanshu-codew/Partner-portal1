@@ -63,8 +63,8 @@
                     <tr>
                         <td class="ps-4">
                             <div class="fw-bold text-dark">
-                                <a href="{% url 'ticket_update' ticket.pk %}" class="text-decoration-none text-dark">{{ ticket.subject }}</a>
-                                {% if ticket.admin_reply %}
+                                <a href="{% url 'ticket_detail' ticket.pk %}" class="text-decoration-none text-dark">{{ ticket.subject }}</a>
+                                {% if ticket.reply_count %}
                                 <span class="badge bg-success ms-1" style="font-size:0.65rem;">
                                     <i class="bi bi-reply-fill me-1"></i>Replied
                                 </span>

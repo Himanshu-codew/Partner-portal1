@@ -24,6 +24,41 @@ class StoredFile(models.Model):
         return self.name
 
 
+class NotificationLog(models.Model):
+    """One delivery attempt of a notification, per channel."""
+
+    STATUS_SENT = 'sent'
+    STATUS_FAILED = 'failed'
+    STATUS_SKIPPED = 'skipped'
+    STATUS_CHOICES = (
+        (STATUS_SENT, 'Sent'),
+        (STATUS_FAILED, 'Failed'),
+        (STATUS_SKIPPED, 'Skipped'),
+    )
+    CHANNEL_EMAIL = 'email'
+    CHANNEL_WHATSAPP = 'whatsapp'
+    CHANNEL_CHOICES = (
+        (CHANNEL_EMAIL, 'Email'),
+        (CHANNEL_WHATSAPP, 'WhatsApp'),
+    )
+
+    user = models.ForeignKey(
+        User, on_delete=models.CASCADE, related_name='notification_logs'
+    )
+    event = models.CharField(max_length=50)
+    channel = models.CharField(max_length=20, choices=CHANNEL_CHOICES)
+    status = models.CharField(max_length=10, choices=STATUS_CHOICES)
+    # Short, redacted reason — never store raw exception payloads here.
+    error = models.CharField(max_length=200, blank=True, default='')
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.event} / {self.channel}: {self.status}"
+
+
 class SoftDeleteQuerySet(models.QuerySet):
     def delete(self, user=None):
         return super().update(is_deleted=True, deleted_at=timezone.now(), deleted_by=user)

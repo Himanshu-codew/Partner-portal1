@@ -1,0 +1,8 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+Your order {{ order.order_number }} is now: {{ order.get_status_display }}.
+
+View your orders: {{ site_url }}/orders/
+
+--
+Partner Portal

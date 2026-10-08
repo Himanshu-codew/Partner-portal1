@@ -1,0 +1,8 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+Your lead "{{ lead.customer_name }}" (Lead #{{ lead.pk }}) is now: {{ lead.get_status_display }}.
+
+View your leads: {{ site_url }}/leads/
+
+--
+Partner Portal

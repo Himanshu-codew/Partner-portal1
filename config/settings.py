@@ -206,6 +206,23 @@ PASSWORD_RESET_TIMEOUT = 3600
 
 
 # ─────────────────────────────────────────────────────────────
+# 7. Notification Service (Phase 2A)
+# ─────────────────────────────────────────────────────────────
+# Absolute base URL used in notification emails. Falls back to the Render
+# external hostname, then to the local dev server.
+SITE_URL = os.environ.get('SITE_URL', '').rstrip('/')
+if not SITE_URL:
+    SITE_URL = f'https://{render_host}' if render_host else 'http://localhost:8000'
+
+# Upper bound on notification emails sent per user-facing day.
+NOTIFY_EMAIL_DAILY_LIMIT = int(os.environ.get('NOTIFY_EMAIL_DAILY_LIMIT', '200'))
+
+# WhatsApp delivery is prepared but not wired to a provider yet; the
+# channel stays disabled until a provider and credentials are chosen.
+WHATSAPP_ENABLED = os.environ.get('WHATSAPP_ENABLED', 'False').lower() in ('true', '1', 't', 'yes')
+
+
+# ─────────────────────────────────────────────────────────────
 # 4. Production Security Hardening
 # ─────────────────────────────────────────────────────────────
 if not DEBUG:

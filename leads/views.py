@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q
+from core.services import notify
 from .models import Lead
 from .forms import LeadForm, AdminLeadForm
 from partners.utils import get_partner_profile, user_can_access_object
@@ -80,8 +81,15 @@ def lead_update_status(request, lead_id):
     lead = get_object_or_404(Lead, id=lead_id)
     new_status = request.POST.get('status')
     if new_status in dict(Lead.STATUS_CHOICES):
+        old_status = lead.status
         lead.status = new_status
         lead.save()
+        if new_status != old_status and lead.partner_id:
+            notify(
+                lead.partner.user,
+                'lead_status_changed',
+                {'lead': lead, 'actor': request.user},
+            )
         messages.success(request, f'Lead #{lead.id} status updated to {lead.get_status_display()}.')
             
     return redirect('lead_list')

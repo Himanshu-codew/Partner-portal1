@@ -1,0 +1,14 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#334155;line-height:1.5;">
+  <p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+  {% if profile.is_approved %}
+  <p>Good news &mdash; your partner account for <strong>&ldquo;{{ profile.company_name }}&rdquo;</strong> has been approved.</p>
+  <p><a href="{{ site_url }}/" style="color:#2563eb;">Sign in to the portal</a></p>
+  {% else %}
+  <p>Your partner account for <strong>&ldquo;{{ profile.company_name }}&rdquo;</strong> was not approved.</p>
+  <p>Please contact us if you have any questions.</p>
+  {% endif %}
+  <p style="color:#64748b;font-size:12px;">&mdash; Partner Portal</p>
+</body>
+</html>

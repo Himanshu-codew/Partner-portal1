@@ -9,7 +9,26 @@ from django.core.paginator import Paginator
 
 from .models import Announcement, Document
 from .forms import AnnouncementForm, DocumentForm
+from partners.models import PartnerProfile
 from partners.utils import get_partner_profile
+from core.services import notify
+
+# Safety valve for the announcement fan-out on a large portal.
+ANNOUNCEMENT_RECIPIENT_LIMIT = 200
+
+
+def get_announcement_recipients(announcement):
+    """
+    Approved partners who should receive this announcement:
+    everyone when visible_to is empty, otherwise only the selected ones.
+    Capped so one announcement can never trigger an unbounded send.
+    """
+    recipients = PartnerProfile.objects.filter(
+        is_approved=True, is_deleted=False, user__is_active=True
+    ).select_related('user')
+    if announcement.visible_to.exists():
+        recipients = recipients.filter(pk__in=announcement.visible_to.all())
+    return recipients[:ANNOUNCEMENT_RECIPIENT_LIMIT]
 
 @login_required(login_url='/login/')
 def content_list(request):
@@ -51,7 +70,13 @@ def announcement_create(request):
     if request.method == 'POST':
         form = AnnouncementForm(request.POST)
         if form.is_valid():
-            form.save()
+            announcement = form.save()
+            for recipient in get_announcement_recipients(announcement):
+                notify(
+                    recipient.user,
+                    'announcement_published',
+                    {'announcement': announcement, 'actor': request.user},
+                )
             messages.success(request, 'Announcement successfully created!')
             return redirect('content_list')
     else:

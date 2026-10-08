@@ -1,0 +1,10 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+{% if profile.is_approved %}Good news — your partner account for "{{ profile.company_name }}" has been approved.
+
+Sign in to the portal: {{ site_url }}/{% else %}Your partner account for "{{ profile.company_name }}" was not approved.
+
+Please contact us if you have any questions.{% endif %}
+
+--
+Partner Portal

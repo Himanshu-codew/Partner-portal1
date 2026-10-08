@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#334155;line-height:1.5;">
+  <p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+  <p>Your lead <strong>&ldquo;{{ lead.customer_name }}&rdquo;</strong> (Lead #{{ lead.pk }}) is now: <strong>{{ lead.get_status_display }}</strong>.</p>
+  <p><a href="{{ site_url }}/leads/" style="color:#2563eb;">View your leads</a></p>
+  <p style="color:#64748b;font-size:12px;">&mdash; Partner Portal</p>
+</body>
+</html>

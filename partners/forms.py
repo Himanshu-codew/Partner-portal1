@@ -1,7 +1,55 @@
 from django import forms
 from django.contrib.auth.models import User, Group
+from django.core.exceptions import ValidationError
+from django.utils import timezone
+from core.utils import normalize_phone
 from .models import PartnerProfile
 import re
+
+
+class WhatsAppPreferencesMixin:
+    """
+    Shared validation for the WhatsApp contact / notification preference
+    fields on PartnerProfile. Normalizes the number to E.164, requires a
+    valid number when the partner opts in, and stamps whatsapp_opt_in_at
+    whenever consent is (re)given.
+    """
+
+    def clean_whatsapp_number(self):
+        raw = self.cleaned_data.get('whatsapp_number')
+        if raw is None or not str(raw).strip():
+            return ''
+        try:
+            normalized = normalize_phone(raw)
+        except ValidationError as exc:
+            raise forms.ValidationError(exc.messages)
+        # Form-level unique validation (no DB constraint; legacy rows may
+        # hold unnormalized duplicates, so only compare normalized values).
+        matches = PartnerProfile.objects.filter(whatsapp_number=normalized)
+        if getattr(self.instance, 'pk', None):
+            matches = matches.exclude(pk=self.instance.pk)
+        if matches.exists():
+            raise forms.ValidationError("A partner with this WhatsApp number already exists.")
+        return normalized
+
+    def clean(self):
+        cleaned_data = super().clean()
+        if 'whatsapp_opt_in' in cleaned_data:
+            opt_in = bool(cleaned_data.get('whatsapp_opt_in'))
+            number = cleaned_data.get('whatsapp_number') or ''
+            if opt_in and not number:
+                self.add_error(
+                    'whatsapp_number',
+                    "Enter a WhatsApp number to receive WhatsApp notifications, or untick the option."
+                )
+            # Stamp / clear consent time directly on the instance so it is
+            # persisted regardless of how the form is saved.
+            if opt_in and number and not self.instance.whatsapp_opt_in_at:
+                self.instance.whatsapp_opt_in_at = timezone.now()
+            elif not opt_in:
+                self.instance.whatsapp_opt_in_at = None
+        return cleaned_data
+
 
 class UserForm(forms.ModelForm):
     password = forms.CharField(
@@ -105,16 +153,31 @@ class GroupForm(forms.ModelForm):
         }
 
 
-class PartnerProfileForm(forms.ModelForm):
+class PartnerProfileForm(WhatsAppPreferencesMixin, forms.ModelForm):
     class Meta:
         model = PartnerProfile
-        fields = ['user', 'company_name', 'phone_number', 'address', 'is_approved']
+        fields = [
+            'user', 'company_name', 'phone_number', 'address', 'is_approved',
+            'whatsapp_number', 'whatsapp_opt_in', 'notify_email', 'notify_whatsapp',
+        ]
         widgets = {
             'user': forms.Select(attrs={'class': 'form-select'}),
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
             'is_approved': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'whatsapp_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+919876543210',
+            }),
+            'whatsapp_opt_in': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_email': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_whatsapp': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'whatsapp_opt_in': 'Opt in to WhatsApp notifications',
+            'notify_email': 'Send notifications by email',
+            'notify_whatsapp': 'Send notifications by WhatsApp',
         }
 
     def clean_phone_number(self):

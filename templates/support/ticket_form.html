@@ -64,11 +64,11 @@
         </div>
     </div>
 
-    <!-- Right: Admin Reply + Status -->
+    <!-- Right: Status -->
     <div class="col-lg-7">
         <div class="card shadow-sm border-0">
             <div class="card-header bg-white border-bottom pt-3 pb-3">
-                <h6 class="mb-0 fw-bold"><i class="bi bi-reply-fill me-2 text-success"></i>Admin Reply & Status</h6>
+                <h6 class="mb-0 fw-bold"><i class="bi bi-arrow-repeat me-2 text-primary"></i>Ticket Status</h6>
             </div>
             <div class="card-body">
                 <form method="POST">
@@ -85,22 +85,9 @@
                         {{ form.description }}
                     </div>
 
-                    <!-- Admin Reply -->
-                    <div class="mb-4">
-                        <label class="form-label fw-semibold">
-                            <i class="bi bi-chat-left-text me-1 text-success"></i>
-                            Reply to Partner
-                            <small class="text-muted fw-normal">(Partner will see this on their ticket page)</small>
-                        </label>
-                        {{ form.admin_reply }}
-                        {% if form.admin_reply.errors %}
-                        <div class="text-danger small mt-1">{{ form.admin_reply.errors }}</div>
-                        {% endif %}
-                    </div>
-
                     <div class="d-flex gap-2">
-                        <button type="submit" class="btn btn-success px-4">
-                            <i class="bi bi-send me-1"></i> Send Reply & Save
+                        <button type="submit" class="btn btn-primary px-4">
+                            <i class="bi bi-check-lg me-1"></i> Save Changes
                         </button>
                         <a href="{% url 'ticket_list' %}" class="btn btn-light px-4">Cancel</a>
                     </div>
@@ -108,20 +95,21 @@
             </div>
         </div>
 
-        {% if form.instance.admin_reply %}
-        <!-- Previous reply preview -->
-        <div class="card shadow-sm border-0 mt-3 border-start border-success border-3">
+        <!-- Conversation shortcut -->
+        <div class="card shadow-sm border-0 mt-3 border-start border-warning border-3">
             <div class="card-body">
-                <h6 class="fw-bold mb-2 text-success"><i class="bi bi-check-circle me-1"></i> Your Previous Reply</h6>
-                <div style="white-space: pre-wrap;">{{ form.instance.admin_reply }}</div>
+                <h6 class="fw-bold mb-2"><i class="bi bi-chat-dots me-1 text-warning"></i> Conversation</h6>
+                <p class="text-muted small mb-2">Replies to the partner live in the ticket thread.</p>
+                <a href="{% url 'ticket_detail' form.instance.pk %}" class="btn btn-sm btn-outline-primary">
+                    <i class="bi bi-arrow-right me-1"></i> Open Conversation
+                </a>
             </div>
         </div>
-        {% endif %}
     </div>
 </div>
 
 {% elif is_update and not request.user.is_staff %}
-<!-- ═══ PARTNER VIEW: Read-only ticket + Admin Reply ═══ -->
+<!-- ═══ PARTNER VIEW: Read-only ticket + link to conversation ═══ -->
 <div class="row g-4">
     <div class="col-lg-8 mx-auto">
         <div class="card shadow-sm border-0">
@@ -145,26 +133,18 @@
                     <div class="p-3 bg-light rounded border" style="white-space: pre-wrap;">{{ form.instance.description }}</div>
                 </div>
 
-                {% if form.instance.admin_reply %}
-                <!-- Admin Reply Box -->
-                <div class="card border-0 bg-success bg-opacity-10 border-start border-success border-3 mb-3">
-                    <div class="card-body">
-                        <h6 class="fw-bold text-success mb-2">
-                            <i class="bi bi-headset me-2"></i>Support Team Reply
-                        </h6>
-                        <div style="white-space: pre-wrap;">{{ form.instance.admin_reply }}</div>
-                        <small class="text-muted d-block mt-2">Updated: {{ form.instance.updated_at|date:"M d, Y H:i" }}</small>
-                    </div>
-                </div>
-                {% else %}
                 <div class="alert alert-info border-0 shadow-sm">
-                    <i class="bi bi-hourglass-split me-2"></i>
-                    Your ticket is under review. Our support team will reply soon.
+                    <i class="bi bi-chat-dots me-2"></i>
+                    See the support team's replies in the conversation thread.
                 </div>
-                {% endif %}
 
-                <div class="text-muted small">
-                    <i class="bi bi-calendar3 me-1"></i> Submitted: {{ form.instance.created_at|date:"M d, Y H:i" }}
+                <div class="d-flex justify-content-between align-items-center">
+                    <div class="text-muted small">
+                        <i class="bi bi-calendar3 me-1"></i> Submitted: {{ form.instance.created_at|date:"M d, Y H:i" }}
+                    </div>
+                    <a href="{% url 'ticket_detail' form.instance.pk %}" class="btn btn-sm btn-outline-primary">
+                        <i class="bi bi-arrow-right me-1"></i> Open Conversation
+                    </a>
                 </div>
             </div>
         </div>

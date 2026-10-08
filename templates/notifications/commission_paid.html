@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#334155;line-height:1.5;">
+  <p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+  <p>Commission of <strong>Rs.{{ order.commission_amount }}</strong> for order <strong>{{ order.order_number }}</strong> has been marked as paid.</p>
+  <p><a href="{{ site_url }}/orders/commission/" style="color:#2563eb;">View your commission</a></p>
+  <p style="color:#64748b;font-size:12px;">&mdash; Partner Portal</p>
+</body>
+</html>

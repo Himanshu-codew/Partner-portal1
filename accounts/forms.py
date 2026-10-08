@@ -1,5 +1,7 @@
 from django import forms
 from django.contrib.auth.models import User
+from core.utils import normalize_phone
+from partners.forms import WhatsAppPreferencesMixin
 from partners.models import PartnerProfile
 import re
 
@@ -52,14 +54,34 @@ class PartnerRegistrationForm(forms.ModelForm):
             raise forms.ValidationError("Passwords do not match!")
         return cleaned_data
 
-class PartnerProfileUpdateForm(forms.ModelForm):
+class PartnerProfileUpdateForm(WhatsAppPreferencesMixin, forms.ModelForm):
     class Meta:
         model = PartnerProfile
-        fields = ['company_name', 'phone_number', 'address']
+        fields = [
+            'company_name', 'phone_number', 'address',
+            'whatsapp_number', 'whatsapp_opt_in', 'notify_email', 'notify_whatsapp',
+        ]
         widgets = {
             'company_name': forms.TextInput(attrs={'class': 'form-control'}),
             'phone_number': forms.TextInput(attrs={'class': 'form-control'}),
             'address': forms.Textarea(attrs={'class': 'form-control', 'rows': 3}),
+            'whatsapp_number': forms.TextInput(attrs={
+                'class': 'form-control',
+                'placeholder': '+919876543210',
+            }),
+            'whatsapp_opt_in': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_email': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+            'notify_whatsapp': forms.CheckboxInput(attrs={'class': 'form-check-input'}),
+        }
+        labels = {
+            'whatsapp_number': 'WhatsApp number',
+            'whatsapp_opt_in': 'I agree to receive WhatsApp notifications',
+            'notify_email': 'Notify me by email',
+            'notify_whatsapp': 'Notify me by WhatsApp',
+        }
+        help_texts = {
+            'whatsapp_number': 'Include country code, e.g. +919876543210.',
+            'whatsapp_opt_in': 'Consent is required before any WhatsApp message is sent.',
         }
 
     def clean_phone_number(self):

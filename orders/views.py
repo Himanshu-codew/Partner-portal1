@@ -4,6 +4,7 @@ from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.core.paginator import Paginator
 from django.db.models import Q, Sum, F, ExpressionWrapper, DecimalField
+from core.services import notify
 from .models import Order
 from .forms import OrderForm
 from partners.utils import get_partner_profile
@@ -11,9 +12,11 @@ from partners.utils import get_partner_profile
 def on_commission_paid(order):
     """
     Hook called when an order's commission is marked as paid.
-    Currently does nothing; reserved for future notifications.
+    Notifies the partner that their commission has been paid out.
     """
-    pass
+    partner = order.partner
+    if partner and partner.user_id:
+        notify(partner.user, 'commission_paid', {'order': order})
 
 @login_required(login_url='/login/')
 def order_list(request):
@@ -125,8 +128,15 @@ def order_update_status(request, order_id):
     order = get_object_or_404(Order, id=order_id)
     new_status = request.POST.get('status')
     if new_status in dict(Order.STATUS_CHOICES):
+        old_status = order.status
         order.status = new_status
         order.save()
+        if new_status != old_status and order.partner_id:
+            notify(
+                order.partner.user,
+                'order_status_changed',
+                {'order': order, 'actor': request.user},
+            )
         messages.success(request, f'Order #{order.order_number} status updated to {order.get_status_display()}.')
             
     return redirect('order_list')

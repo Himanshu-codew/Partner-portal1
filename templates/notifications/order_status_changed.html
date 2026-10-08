@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html lang="en">
+<body style="margin:0;padding:16px;font-family:Arial,Helvetica,sans-serif;color:#334155;line-height:1.5;">
+  <p>Hi {{ recipient.first_name|default:recipient.username }},</p>
+  <p>Your order <strong>{{ order.order_number }}</strong> is now: <strong>{{ order.get_status_display }}</strong>.</p>
+  <p><a href="{{ site_url }}/orders/" style="color:#2563eb;">View your orders</a></p>
+  <p style="color:#64748b;font-size:12px;">&mdash; Partner Portal</p>
+</body>
+</html>

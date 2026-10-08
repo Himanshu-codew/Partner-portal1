@@ -1,0 +1,8 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+Commission of Rs.{{ order.commission_amount }} for order {{ order.order_number }} has been marked as paid.
+
+View your commission: {{ site_url }}/orders/commission/
+
+--
+Partner Portal
