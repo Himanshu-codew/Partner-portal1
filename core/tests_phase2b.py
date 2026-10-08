@@ -32,6 +32,7 @@ from core.services.whatsapp import (
     get_provider,
 )
 from core.tests import BaseTestCase
+from partners.models import PartnerDocument
 from portal_content.models import Announcement
 from support.models import TicketReply
 
@@ -456,6 +457,9 @@ class WhatsAppTemplateTests(BaseTestCase):
 
     def test_every_event_has_a_short_plain_text_template(self):
         announcement = Announcement.objects.create(title='Big news', content='Details here.')
+        document = PartnerDocument.objects.create(
+            partner=self.partner_profile, doc_type='PAN'
+        )
         contexts = {
             'ticket_reply': {'ticket': self.ticket, 'reply': self.reply},
             'lead_status_changed': {'lead': self.make_lead()},
@@ -463,6 +467,7 @@ class WhatsAppTemplateTests(BaseTestCase):
             'commission_paid': {'order': self.make_order()},
             'partner_approval_changed': {'profile': self.partner_profile},
             'announcement_published': {'announcement': announcement},
+            'kyc_reviewed': {'document': document},
         }
         self.assertEqual(set(contexts), set(EVENTS))
 

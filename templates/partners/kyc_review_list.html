@@ -1,0 +1,118 @@
+{% extends 'base.html' %}
+{% block title %}KYC Documents | Admin Dashboard{% endblock %}
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4 flex-wrap">
+    <div>
+        <h2 class="mb-1"><i class="bi bi-file-earmark-check-fill text-primary me-2"></i>KYC Documents</h2>
+        <p class="text-muted mb-0">
+            Review partner KYC and invoice uploads.
+            {% if pending_count > 0 %}
+            <span class="badge bg-danger rounded-pill px-2 py-1 ms-1">{{ pending_count }} pending</span>
+            {% else %}
+            <span class="badge bg-success rounded-pill px-2 py-1 ms-1">All reviewed</span>
+            {% endif %}
+        </p>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0 mb-4">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <form method="GET" class="d-flex w-100 gap-2 flex-wrap">
+            <div class="input-group" style="min-width: 240px; flex: 1;">
+                <span class="input-group-text bg-white border-end-0 text-muted"><i class="bi bi-search"></i></span>
+                <input type="text" name="q" value="{{ request.GET.q }}" class="form-control border-start-0 ps-0" placeholder="Search by company name...">
+            </div>
+            <select name="review" class="form-select" style="max-width: 170px;">
+                <option value="">All review statuses</option>
+                {% for value, label in review_choices.items %}
+                <option value="{{ value }}" {% if review_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <select name="type" class="form-select" style="max-width: 170px;">
+                <option value="">All document types</option>
+                {% for value, label in type_choices.items %}
+                <option value="{{ value }}" {% if type_filter == value %}selected{% endif %}>{{ label }}</option>
+                {% endfor %}
+            </select>
+            <button type="submit" class="btn btn-primary px-4">Filter</button>
+            {% if request.GET.q or review_filter or type_filter %}
+            <a href="?" class="btn border bg-white text-muted"><i class="bi bi-x-lg"></i> Clear</a>
+            {% endif %}
+        </form>
+    </div>
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-custom table-hover mb-0 align-middle">
+                <thead>
+                    <tr>
+                        <th class="ps-4">Partner</th>
+                        <th>Type</th>
+                        <th>File</th>
+                        <th>OCR</th>
+                        <th>Review</th>
+                        <th>Uploaded</th>
+                        <th class="text-end pe-4">Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in page_obj %}
+                    <tr>
+                        <td class="ps-4 fw-bold text-primary">{{ doc.partner.company_name }}</td>
+                        <td>{{ doc.get_doc_type_display }}</td>
+                        <td>
+                            <div class="d-flex align-items-center text-muted small">
+                                {% if not doc.file_exists %}
+                                <i class="bi bi-file-earmark-x fs-4 text-secondary me-2"></i>
+                                <span class="fst-italic">&mdash;</span>
+                                {% elif doc.file_extension == 'pdf' %}
+                                <i class="bi bi-file-earmark-pdf fs-4 text-danger me-2"></i>{{ doc.file_size_display }}
+                                {% elif doc.file_extension == 'png' or doc.file_extension == 'jpg' or doc.file_extension == 'jpeg' %}
+                                <i class="bi bi-file-earmark-image fs-4 text-info me-2"></i>{{ doc.file_size_display }}
+                                {% else %}
+                                <i class="bi bi-file-earmark fs-4 text-secondary me-2"></i>{{ doc.file_size_display }}
+                                {% endif %}
+                            </div>
+                        </td>
+                        <td>
+                            {% if doc.ocr_status == 'done' %}
+                            <span class="badge bg-success rounded-pill px-2 py-1"><i class="bi bi-check-circle me-1"></i>Done</span>
+                            {% elif doc.ocr_status == 'processing' %}
+                            <span class="badge bg-primary rounded-pill px-2 py-1"><i class="bi bi-arrow-repeat me-1"></i>Processing</span>
+                            {% elif doc.ocr_status == 'failed' %}
+                            <span class="badge bg-danger rounded-pill px-2 py-1" title="{{ doc.ocr_error }}"><i class="bi bi-x-circle me-1"></i>Failed</span>
+                            {% elif doc.ocr_status == 'skipped' %}
+                            <span class="badge bg-warning text-dark rounded-pill px-2 py-1" title="{{ doc.ocr_error }}"><i class="bi bi-slash-circle me-1"></i>Skipped</span>
+                            {% else %}
+                            <span class="badge bg-secondary rounded-pill px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            {% if doc.review_status == 'approved' %}
+                            <span class="badge bg-success rounded-pill px-2 py-1"><i class="bi bi-check-circle me-1"></i>Approved</span>
+                            {% elif doc.review_status == 'rejected' %}
+                            <span class="badge bg-danger rounded-pill px-2 py-1"><i class="bi bi-x-circle me-1"></i>Rejected</span>
+                            {% else %}
+                            <span class="badge bg-warning text-dark rounded-pill px-2 py-1"><i class="bi bi-clock me-1"></i>Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>{{ doc.uploaded_at|date:"M d, Y" }}</td>
+                        <td class="text-end pe-4">
+                            <a href="{% url 'kyc_document_detail' doc.pk %}" class="btn btn-sm btn-white text-primary" title="Review document" aria-label="Review document"><i class="bi bi-eye"></i></a>
+                        </td>
+                    </tr>
+                    {% empty %}
+                    <tr>
+                        <td colspan="7" class="text-center py-5 text-muted">
+                            <i class="bi bi-folder2-open text-light mb-3" style="font-size: 3rem; display: block;"></i>
+                            <p class="mb-0">No documents match these filters.</p>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{% include 'includes/pagination.html' %}
+{% endblock %}

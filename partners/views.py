@@ -1,13 +1,22 @@
+import os
+import threading
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.contrib.auth.models import User, Group
+from django.db import transaction
 from django.db.models import Q
 from django.core.paginator import Paginator
-from .models import PartnerProfile
-from .forms import UserForm, GroupForm, PartnerProfileForm
+from django.http import FileResponse
+from django.urls import reverse
+from django.utils import timezone
+from .models import PartnerProfile, PartnerDocument
+from .forms import UserForm, GroupForm, PartnerProfileForm, PartnerDocumentForm
+from .utils import get_partner_profile, user_can_access_object
 from core.services import notify
+from core.services.ocr import process_document
 
 def on_partner_approval_changed(profile):
     """
@@ -239,3 +248,214 @@ def group_delete(request, pk):
     g.delete()
     messages.success(request, 'Group deleted!')
     return redirect('group_list')
+
+
+# =================================================================
+# KYC documents & OCR (Phase 3)
+# =================================================================
+
+def _schedule_ocr(document_pk):
+    """Run OCR on a daemon thread once the upload transaction has committed.
+
+    Render's free tier has no worker process, so the thread is spawned here
+    instead of by a queue. ``process_document`` never raises and always
+    closes its DB connection.
+    """
+    transaction.on_commit(
+        lambda: threading.Thread(
+            target=process_document, args=(document_pk,), daemon=True
+        ).start()
+    )
+
+
+def _kyc_redirect_target(user, document):
+    """Where to send a user after a download/retry problem (never raises)."""
+    if user.is_staff:
+        return reverse('kyc_document_detail', args=[document.pk])
+    return reverse('kyc_document_list')
+
+
+@login_required(login_url='/login/')
+def kyc_document_list(request):
+    """Staff: the KYC review queue. Partner: their own documents + upload."""
+    if request.user.is_staff:
+        documents = (
+            PartnerDocument.objects
+            .select_related('partner', 'partner__user', 'reviewed_by')
+            .order_by('-uploaded_at')
+        )
+        review_choices = dict(PartnerDocument.REVIEW_STATUS_CHOICES)
+        type_choices = dict(PartnerDocument.DOC_TYPE_CHOICES)
+
+        review_filter = request.GET.get('review', '')
+        if review_filter not in review_choices:
+            review_filter = ''
+        else:
+            documents = documents.filter(review_status=review_filter)
+
+        type_filter = request.GET.get('type', '')
+        if type_filter not in type_choices:
+            type_filter = ''
+        else:
+            documents = documents.filter(doc_type=type_filter)
+
+        query = request.GET.get('q', '').strip()
+        if query:
+            documents = documents.filter(partner__company_name__icontains=query)
+
+        paginator = Paginator(documents, 10)
+        page_obj = paginator.get_page(request.GET.get('page'))
+        return render(request, 'partners/kyc_review_list.html', {
+            'page_obj': page_obj,
+            'pending_count': PartnerDocument.objects.filter(review_status='pending').count(),
+            'review_filter': review_filter,
+            'type_filter': type_filter,
+            'review_choices': review_choices,
+            'type_choices': type_choices,
+        })
+
+    profile = get_partner_profile(request.user)
+    if not profile or not profile.is_approved:
+        messages.warning(request, "Your account is waiting for administrator approval.")
+        return redirect('approval_pending')
+
+    documents = PartnerDocument.objects.filter(partner=profile).order_by('-uploaded_at')
+    paginator = Paginator(documents, 10)
+    page_obj = paginator.get_page(request.GET.get('page'))
+    return render(request, 'partners/kyc_list.html', {
+        'page_obj': page_obj,
+        'form': PartnerDocumentForm(),
+    })
+
+
+@login_required(login_url='/login/')
+@require_POST
+def kyc_document_upload(request):
+    profile = get_partner_profile(request.user)
+    if not profile or not profile.is_approved:
+        messages.warning(request, "Your account is waiting for administrator approval.")
+        return redirect('approval_pending')
+
+    form = PartnerDocumentForm(request.POST, request.FILES)
+    if not form.is_valid():
+        for error in form.errors.values():
+            messages.error(request, ' '.join(error))
+        return redirect('kyc_document_list')
+
+    document = form.save(commit=False)
+    document.partner = profile
+    document.save()
+    _schedule_ocr(document.pk)
+    messages.success(request, 'Document uploaded. Text extraction runs in the background.')
+    return redirect('kyc_document_list')
+
+
+@login_required(login_url='/login/')
+def kyc_document_detail(request, pk):
+    """Staff-only review page: preview, OCR text, suggestions, decisions."""
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+    document = get_object_or_404(
+        PartnerDocument.objects.select_related('partner', 'partner__user', 'reviewed_by'),
+        pk=pk,
+    )
+    return render(request, 'partners/kyc_review_detail.html', {'document': document})
+
+
+@login_required(login_url='/login/')
+def kyc_document_download(request, pk):
+    """Download the original file — staff or the owning approved partner only.
+
+    ``?inline=1`` serves the file without the attachment header so the staff
+    detail page can preview images and PDFs in the browser.
+    """
+    document = get_object_or_404(PartnerDocument, pk=pk)
+
+    if not request.user.is_staff:
+        profile = get_partner_profile(request.user)
+        if not profile or not profile.is_approved:
+            messages.error(request, "Your account must be approved to access documents.")
+            return redirect('approval_pending')
+        if document.partner_id != profile.pk:
+            messages.error(request, "You do not have permission to access this document.")
+            return redirect('kyc_document_list')
+
+    if not document.file:
+        messages.error(request, "File missing from storage.")
+        return redirect(_kyc_redirect_target(request.user, document))
+
+    try:
+        if not document.file_exists:
+            messages.error(request, "File missing from storage.")
+            return redirect(_kyc_redirect_target(request.user, document))
+
+        file_handle = document.file.open('rb')
+        filename = os.path.basename(document.file.name)
+        get_content_type = getattr(document.file.storage, 'get_content_type', None)
+        content_type = None
+        if callable(get_content_type):
+            content_type = get_content_type(document.file.name) or None
+        inline = request.GET.get('inline') == '1'
+        return FileResponse(
+            file_handle,
+            as_attachment=not inline,
+            filename=filename,
+            content_type=content_type,
+        )
+    except (FileNotFoundError, OSError, ValueError):
+        messages.error(request, "File missing from storage.")
+        return redirect(_kyc_redirect_target(request.user, document))
+
+
+@login_required(login_url='/login/')
+@require_POST
+def kyc_document_retry_ocr(request, pk):
+    """POST-only OCR retry for staff or the owning approved partner."""
+    document = get_object_or_404(PartnerDocument, pk=pk)
+    if not user_can_access_object(request.user, document, partner_field='partner'):
+        messages.error(request, 'Unauthorized access.')
+        return redirect('kyc_document_list')
+
+    if document.ocr_status == 'processing':
+        messages.warning(request, 'Text extraction is already running for this document.')
+        return redirect(_kyc_redirect_target(request.user, document))
+
+    document.ocr_status = 'pending'
+    document.ocr_error = ''
+    document.save(update_fields=['ocr_status', 'ocr_error'])
+    _schedule_ocr(document.pk)
+    messages.success(request, 'Retrying text extraction in the background.')
+    return redirect(_kyc_redirect_target(request.user, document))
+
+
+@login_required(login_url='/login/')
+@require_POST
+def kyc_document_review(request, pk):
+    """Staff-only approve/reject decision; notifies the partner afterwards."""
+    if not request.user.is_staff:
+        messages.error(request, 'Unauthorized access.')
+        return redirect('dashboard')
+
+    document = get_object_or_404(PartnerDocument, pk=pk)
+    action = request.POST.get('action', '')
+    if action not in ('approve', 'reject'):
+        messages.error(request, 'Unknown review action.')
+        return redirect('kyc_document_detail', pk=pk)
+
+    note = (request.POST.get('note') or '').strip()
+    document.review_status = 'approved' if action == 'approve' else 'rejected'
+    document.reviewed_by = request.user
+    document.reviewed_at = timezone.now()
+    document.review_note = note
+    document.save(update_fields=[
+        'review_status', 'reviewed_by', 'reviewed_at', 'review_note',
+    ])
+
+    notify(
+        document.partner.user,
+        'kyc_reviewed',
+        {'document': document, 'actor': request.user},
+    )
+    messages.success(request, f"Document marked as {document.get_review_status_display().lower()}.")
+    return redirect('kyc_document_detail', pk=pk)

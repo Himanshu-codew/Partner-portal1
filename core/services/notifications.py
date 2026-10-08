@@ -44,6 +44,7 @@ EVENTS = {
     'commission_paid': 'Commission paid for your order',
     'partner_approval_changed': 'Your partner account status changed',
     'announcement_published': 'New announcement on the Partner Portal',
+    'kyc_reviewed': 'Your KYC document was reviewed',
 }
 
 CHANNELS = ('email', 'whatsapp')

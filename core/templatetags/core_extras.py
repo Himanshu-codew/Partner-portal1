@@ -11,6 +11,12 @@ def get_recycle_bin_count():
     count = sum(model.deleted_objects.count() for model in get_soft_deleted_models().values())
     return count
 
+@register.simple_tag
+def get_kyc_pending_count():
+    """Documents still waiting for a staff review decision (Phase 3)."""
+    from partners.models import PartnerDocument
+    return PartnerDocument.objects.filter(review_status='pending').count()
+
 @register.simple_tag(takes_context=True)
 def get_notifications_count(context):
     """Return count of unread notifications (items created after last_read_at)."""

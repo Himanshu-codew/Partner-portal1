@@ -5,6 +5,7 @@ Hardened for security and production readiness on Render.
 """
 
 import os
+import sys
 from pathlib import Path
 import dj_database_url
 from django.core.exceptions import ImproperlyConfigured
@@ -143,6 +144,13 @@ AUTH_PASSWORD_VALIDATORS = [
     },
 ]
 
+# Test runs only: the real password hashers (PBKDF2/Argon2) are deliberately
+# slow, which dominates the suite runtime. Under `manage.py test` we fall back
+# to MD5 hashing — passwords created/checked by tests never leave the test
+# database, so this is safe and does not affect production hashers.
+if 'test' in sys.argv:
+    PASSWORD_HASHERS = ['django.contrib.auth.hashers.MD5PasswordHasher']
+
 
 # Internationalization
 # https://docs.djangoproject.com/en/6.1/topics/i18n/
@@ -236,6 +244,24 @@ WHATSAPP_ALLOWED_NUMBERS = [
 
 # Upper bound on WhatsApp messages sent per day (<= 0 means unlimited).
 NOTIFY_WHATSAPP_DAILY_LIMIT = int(os.environ.get('NOTIFY_WHATSAPP_DAILY_LIMIT', '50'))
+
+
+# ─────────────────────────────────────────────────────────────
+# 9. OCR for KYC documents (Phase 3)
+# ─────────────────────────────────────────────────────────────
+# OCR stays completely off until OCR_ENABLED is turned on and an API key is
+# provided. Uploads still work when disabled — they are just marked
+# "skipped" so a reviewer can key in the details manually.
+OCR_ENABLED = os.environ.get('OCR_ENABLED', 'False').lower() in ('true', '1', 't', 'yes')
+OCR_PROVIDER = os.environ.get('OCR_PROVIDER', 'ocrspace').strip() or 'ocrspace'
+OCRSPACE_API_KEY = os.environ.get('OCRSPACE_API_KEY', '').strip()
+
+# Upper bound on OCR calls per day (<= 0 means unlimited).
+OCR_DAILY_LIMIT = int(os.environ.get('OCR_DAILY_LIMIT', '100'))
+
+# Files larger than this are downscaled client-side (images, via Pillow)
+# instead of being uploaded verbatim to the OCR provider.
+OCR_MAX_BYTES = int(os.environ.get('OCR_MAX_BYTES', str(1024 * 1024)))
 
 
 # ─────────────────────────────────────────────────────────────

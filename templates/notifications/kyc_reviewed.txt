@@ -1,0 +1,10 @@
+Hi {{ recipient.first_name|default:recipient.username }},
+
+Your {{ document.get_doc_type_display }} document for "{{ document.partner.company_name }}" was {{ document.get_review_status_display|lower }}{% if document.reviewed_by %} by {{ document.reviewed_by.username }}{% endif %}.{% if document.review_note %}
+
+Note from the reviewer: {{ document.review_note }}{% endif %}
+
+Review it in the portal: {{ site_url }}/partners/kyc/{{ document.pk }}/
+
+--
+Partner Portal

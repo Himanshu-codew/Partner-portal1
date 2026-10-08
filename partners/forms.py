@@ -3,8 +3,12 @@ from django.contrib.auth.models import User, Group
 from django.core.exceptions import ValidationError
 from django.utils import timezone
 from core.utils import normalize_phone
-from .models import PartnerProfile
+from .models import PartnerProfile, PartnerDocument
+import os
 import re
+
+ALLOWED_DOCUMENT_EXTENSIONS = {'pdf', 'jpg', 'jpeg', 'png'}
+MAX_DOCUMENT_SIZE = 5 * 1024 * 1024  # 5 MB
 
 
 class WhatsAppPreferencesMixin:
@@ -201,3 +205,35 @@ class PartnerProfileForm(WhatsAppPreferencesMixin, forms.ModelForm):
         if not re.search(r'[a-zA-Z]', name or ''):
             raise forms.ValidationError("Company name must contain alphabets.")
         return name
+
+
+class PartnerDocumentForm(forms.ModelForm):
+    """Upload form for partner KYC / invoice documents (Phase 3)."""
+
+    class Meta:
+        model = PartnerDocument
+        fields = ['doc_type', 'file']
+        widgets = {
+            'doc_type': forms.Select(attrs={'class': 'form-select'}),
+            'file': forms.FileInput(attrs={'class': 'form-control'}),
+        }
+
+    def clean_file(self):
+        uploaded = self.cleaned_data.get('file')
+        if not uploaded:
+            return uploaded
+
+        if hasattr(uploaded, 'size') and uploaded.size > MAX_DOCUMENT_SIZE:
+            size_mb = uploaded.size / (1024 * 1024)
+            raise forms.ValidationError(
+                f"File size exceeds the 5 MB limit (uploaded file is {size_mb:.1f} MB)."
+            )
+
+        _, ext = os.path.splitext(getattr(uploaded, 'name', ''))
+        clean_ext = ext.lstrip('.').lower()
+        if clean_ext not in ALLOWED_DOCUMENT_EXTENSIONS:
+            allowed_list = ', '.join(sorted(ALLOWED_DOCUMENT_EXTENSIONS))
+            raise forms.ValidationError(
+                f"File type '.{clean_ext}' is not permitted. Allowed extensions are: {allowed_list}."
+            )
+        return uploaded

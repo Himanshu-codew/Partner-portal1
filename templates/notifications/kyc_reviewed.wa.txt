@@ -1,0 +1,1 @@
+Partner Portal: your {{ document.get_doc_type_display|truncatechars:30 }} document for "{{ document.partner.company_name|truncatechars:30 }}" was {{ document.get_review_status_display|lower }}. Open: {{ site_url }}/partners/kyc/{{ document.pk }}/

@@ -69,6 +69,15 @@
             </a>
         </li>
         {% endif %}
+        {% get_kyc_pending_count as kyc_pending_count %}
+        <li class="sidebar-item {% if '/partners/kyc/' in request.path %}active{% endif %}">
+            <a href="{% url 'kyc_document_list' %}" class="sidebar-link">
+                <i class="bi bi-file-earmark-person"></i> KYC Documents
+                {% if kyc_pending_count > 0 %}
+                <span class="badge bg-danger rounded-pill ms-auto">{{ kyc_pending_count }}</span>
+                {% endif %}
+            </a>
+        </li>
 
         {% if perms.portal_content.view_announcement or perms.portal_content.view_document %}
         <div class="sidebar-section-title">Portal Content</div>
@@ -138,6 +147,11 @@
         <li class="sidebar-item {% if '/resources/' in request.path %}active{% endif %}">
             <a href="{% url 'content_list' %}" class="sidebar-link">
                 <i class="bi bi-file-earmark-text"></i> Resources
+            </a>
+        </li>
+        <li class="sidebar-item {% if '/partners/kyc/' in request.path %}active{% endif %}">
+            <a href="{% url 'kyc_document_list' %}" class="sidebar-link">
+                <i class="bi bi-file-earmark-person"></i> My KYC
             </a>
         </li>
     {% endif %}

@@ -1,0 +1,160 @@
+{% extends 'base.html' %}
+{% block title %}Review KYC Document | Admin Dashboard{% endblock %}
+{% block content %}
+<div class="mb-4">
+    <a href="{% url 'kyc_document_list' %}" class="btn btn-outline-secondary mb-3"><i class="bi bi-arrow-left"></i> Back to KYC Documents</a>
+    <div class="d-flex justify-content-between align-items-center flex-wrap gap-2">
+        <div>
+            <h2 class="mb-1"><i class="bi bi-file-earmark-check-fill text-primary me-2"></i>{{ document.partner.company_name }} &mdash; {{ document.get_doc_type_display }}</h2>
+            <p class="text-muted mb-0">
+                Uploaded {{ document.uploaded_at|date:"M d, Y H:i" }}
+                {% if document.reviewed_by %} &middot; reviewed by {{ document.reviewed_by.username }} on {{ document.reviewed_at|date:"M d, Y H:i" }}{% endif %}
+            </p>
+        </div>
+        <div class="d-flex gap-2">
+            {% if document.review_status == 'approved' %}
+            <span class="badge bg-success rounded-pill px-3 py-2"><i class="bi bi-check-circle me-1"></i>Approved</span>
+            {% elif document.review_status == 'rejected' %}
+            <span class="badge bg-danger rounded-pill px-3 py-2"><i class="bi bi-x-circle me-1"></i>Rejected</span>
+            {% else %}
+            <span class="badge bg-warning text-dark rounded-pill px-3 py-2"><i class="bi bi-clock me-1"></i>Pending review</span>
+            {% endif %}
+        </div>
+    </div>
+</div>
+
+<div class="row g-4 mb-4">
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-file-earmark me-2 text-primary"></i>Original file</h5>
+            </div>
+            <div class="card-body">
+                {% if not document.file_exists %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-file-earmark-x mb-2" style="font-size: 3rem; display: block;"></i>
+                    <p class="mb-0">The file is missing from storage.</p>
+                </div>
+                {% elif document.preview_kind == 'image' %}
+                <a href="{% url 'kyc_document_download' document.pk %}?inline=1" target="_blank">
+                    <img src="{% url 'kyc_document_download' document.pk %}?inline=1" alt="{{ document.get_doc_type_display }}" class="img-fluid rounded border" style="max-height: 480px;">
+                </a>
+                {% elif document.preview_kind == 'pdf' %}
+                <object data="{% url 'kyc_document_download' document.pk %}?inline=1" type="application/pdf" style="width: 100%; height: 480px;">
+                    <p class="text-muted mb-2">Your browser cannot display PDFs inline.</p>
+                </object>
+                {% else %}
+                <div class="text-center text-muted py-4">
+                    <i class="bi bi-file-earmark mb-2" style="font-size: 3rem; display: block;"></i>
+                    <p class="mb-2">No inline preview for this file type.</p>
+                </div>
+                {% endif %}
+                <div class="d-flex justify-content-between align-items-center mt-3 small text-muted">
+                    <span><i class="bi bi-hdd me-1"></i>{{ document.file_size_display }} &middot; .{{ document.file_extension|upper }}</span>
+                    <a href="{% url 'kyc_document_download' document.pk %}" class="btn btn-sm btn-white text-dark"><i class="bi bi-download me-1"></i>Download</a>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="col-lg-6">
+        <div class="card shadow-sm border-0 h-100">
+            <div class="card-header bg-white border-bottom-0 pt-3 pb-3 d-flex justify-content-between align-items-center">
+                <h5 class="mb-0 fw-semibold"><i class="bi bi-cpu me-2 text-primary"></i>Text extraction</h5>
+                <div class="d-flex gap-2 align-items-center">
+                    {% if document.ocr_status == 'done' %}
+                    <span class="badge bg-success rounded-pill px-2 py-1"><i class="bi bi-check-circle me-1"></i>Done</span>
+                    {% elif document.ocr_status == 'processing' %}
+                    <span class="badge bg-primary rounded-pill px-2 py-1"><i class="bi bi-arrow-repeat me-1"></i>Processing</span>
+                    {% elif document.ocr_status == 'failed' %}
+                    <span class="badge bg-danger rounded-pill px-2 py-1"><i class="bi bi-x-circle me-1"></i>Failed</span>
+                    {% elif document.ocr_status == 'skipped' %}
+                    <span class="badge bg-warning text-dark rounded-pill px-2 py-1"><i class="bi bi-slash-circle me-1"></i>Skipped</span>
+                    {% else %}
+                    <span class="badge bg-secondary rounded-pill px-2 py-1"><i class="bi bi-hourglass-split me-1"></i>Pending</span>
+                    {% endif %}
+                    {% if document.ocr_status != 'processing' %}
+                    <form method="post" action="{% url 'kyc_document_retry_ocr' document.pk %}" class="d-inline">
+                        {% csrf_token %}
+                        <button type="submit" class="btn btn-sm btn-white text-primary" title="Retry OCR"><i class="bi bi-arrow-repeat me-1"></i>Retry OCR</button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+            <div class="card-body">
+                {% if document.ocr_error %}
+                <div class="alert alert-warning py-2 small mb-3"><i class="bi bi-exclamation-triangle me-1"></i>{{ document.ocr_error }}</div>
+                {% endif %}
+
+                <h6 class="fw-semibold text-muted small text-uppercase mb-2">Extracted text (Aadhaar numbers masked)</h6>
+                <pre class="bg-dark text-light border rounded p-3 small mb-4" style="max-height: 220px; overflow-y: auto; white-space: pre-wrap;">{% if document.ocr_text %}{{ document.ocr_text }}{% else %}&mdash;{% endif %}</pre>
+
+                <h6 class="fw-semibold text-muted small text-uppercase mb-2">Suggested details &mdash; confirm before use</h6>
+                {% if document.extracted %}
+                <dl class="row small mb-0">
+                    {% if document.extracted.pan %}
+                    <dt class="col-5 text-muted">PAN</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.pan }}</dd>
+                    {% endif %}
+                    {% if document.extracted.gst %}
+                    <dt class="col-5 text-muted">GSTIN</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.gst }}</dd>
+                    {% endif %}
+                    {% if document.extracted.ifsc %}
+                    <dt class="col-5 text-muted">IFSC</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.ifsc }}</dd>
+                    {% endif %}
+                    {% if document.extracted.account_numbers %}
+                    <dt class="col-5 text-muted">Account numbers</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.account_numbers|join:", " }}</dd>
+                    {% endif %}
+                    {% if document.extracted.invoice_numbers %}
+                    <dt class="col-5 text-muted">Invoice numbers</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.invoice_numbers|join:", " }}</dd>
+                    {% endif %}
+                    {% if document.extracted.amount %}
+                    <dt class="col-5 text-muted">Total amount</dt>
+                    <dd class="col-7 fw-semibold">{{ document.extracted.amount }}</dd>
+                    {% endif %}
+                    {% if document.extracted.emails %}
+                    <dt class="col-5 text-muted">Emails</dt>
+                    <dd class="col-7">{{ document.extracted.emails|join:", " }}</dd>
+                    {% endif %}
+                    {% if document.extracted.mobiles %}
+                    <dt class="col-5 text-muted">Mobiles</dt>
+                    <dd class="col-7">{{ document.extracted.mobiles|join:", " }}</dd>
+                    {% endif %}
+                </dl>
+                {% else %}
+                <p class="text-muted small mb-0">No suggestions were extracted from this document.</p>
+                {% endif %}
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="card shadow-sm border-0">
+    <div class="card-header bg-white border-bottom-0 pt-3 pb-3">
+        <h5 class="mb-0 fw-semibold"><i class="bi bi-clipboard-check me-2 text-primary"></i>Review decision</h5>
+    </div>
+    <div class="card-body">
+        <form method="post" action="{% url 'kyc_document_review' document.pk %}">
+            {% csrf_token %}
+            <div class="mb-3">
+                <label for="review_note" class="form-label fw-bold">Note (optional)</label>
+                <textarea name="note" id="review_note" class="form-control" rows="2" placeholder="Shown to the partner with the decision...">{{ document.review_note }}</textarea>
+            </div>
+            {% if document.review_status != 'pending' %}
+            <div class="alert alert-secondary py-2 small">
+                Current status: <strong>{{ document.get_review_status_display }}</strong>
+                {% if document.review_note %} &mdash; "{{ document.review_note }}"{% endif %}
+            </div>
+            {% endif %}
+            <div class="d-flex gap-2">
+                <button type="submit" name="action" value="approve" class="btn btn-success px-4 fw-semibold"><i class="bi bi-check-lg me-1"></i>Approve</button>
+                <button type="submit" name="action" value="reject" class="btn btn-danger px-4 fw-semibold"><i class="bi bi-x-lg me-1"></i>Reject</button>
+            </div>
+        </form>
+    </div>
+</div>
+{% endblock %}

@@ -17,4 +17,12 @@ urlpatterns = [
     path('groups/add/', views.group_create, name='group_create'),
     path('groups/<int:pk>/edit/', views.group_update, name='group_update'),
     path('groups/<int:pk>/delete/', views.group_delete, name='group_delete'),
+
+    # KYC documents & OCR (Phase 3)
+    path('kyc/', views.kyc_document_list, name='kyc_document_list'),
+    path('kyc/upload/', views.kyc_document_upload, name='kyc_document_upload'),
+    path('kyc/<int:pk>/', views.kyc_document_detail, name='kyc_document_detail'),
+    path('kyc/<int:pk>/download/', views.kyc_document_download, name='kyc_document_download'),
+    path('kyc/<int:pk>/retry-ocr/', views.kyc_document_retry_ocr, name='kyc_document_retry_ocr'),
+    path('kyc/<int:pk>/review/', views.kyc_document_review, name='kyc_document_review'),
 ]
