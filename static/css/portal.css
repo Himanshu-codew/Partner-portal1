@@ -793,3 +793,85 @@ body { overflow-x: clip; }
     .stat-card { min-width: 0; }
     .stat-card .card-body { padding: 1rem; }
 }
+
+/* ═══════════════════════════════════════════════
+   GLOBAL SEARCH (Phase 4B)
+═══════════════════════════════════════════════ */
+.topbar-search-form { margin: 0; }
+
+/* Anchored dropdown: the input-group is positioned on desktop (relative)
+   and already positioned on mobile when expanded, so it works in both. */
+#topbarSearch { position: relative; }
+
+.search-suggest {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    right: 0;
+    z-index: 1031;
+    min-width: 320px;
+    max-width: min(420px, calc(100vw - 16px));
+    max-height: 60vh;
+    overflow-y: auto;
+    padding: 6px;
+    background-color: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.search-suggest[hidden] { display: none; }
+
+.search-suggest-group {
+    padding: 6px 10px 2px;
+    font-size: 0.7rem;
+    font-weight: 700;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-muted);
+}
+
+.search-suggest-item {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    padding: 8px 10px;
+    border-radius: 8px;
+    color: var(--text-main);
+    text-decoration: none;
+}
+
+.search-suggest-item:hover,
+.search-suggest-item.active {
+    background-color: var(--surface-2);
+    color: var(--text-main);
+}
+
+.search-suggest-item > i { color: var(--text-muted); }
+
+.search-suggest-body { min-width: 0; }
+
+.search-suggest-title {
+    font-weight: 600;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-suggest-sub {
+    font-size: 0.78rem;
+    color: var(--text-muted);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.search-suggest-empty {
+    padding: 14px 10px;
+    text-align: center;
+    color: var(--text-muted);
+    font-size: 0.875rem;
+}
+
+/* Results page: long values truncate instead of breaking the 375px layout */
+.search-result-text { min-width: 0; }

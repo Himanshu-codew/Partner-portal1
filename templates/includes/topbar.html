@@ -15,14 +15,20 @@
         </button>
 
         <!-- Search Input -->
-        <div id="topbarSearch" class="input-group d-none d-sm-flex" style="width: 250px;">
-            <span class="input-group-text border-end-0"
-                  style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-muted);">
-                <i class="bi bi-search"></i>
-            </span>
-            <input type="text" class="form-control border-start-0" placeholder="Search leads, orders..."
-                   style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-main);">
-        </div>
+        <form id="topbarSearchForm" class="topbar-search-form" method="get" action="{% url 'search' %}" role="search">
+            <div id="topbarSearch" class="input-group d-none d-sm-flex" style="width: 250px;">
+                <span class="input-group-text border-end-0"
+                      style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-muted);">
+                    <i class="bi bi-search"></i>
+                </span>
+                <input type="search" name="q" id="topbarSearchInput" class="form-control border-start-0"
+                       value="{{ request.GET.q|default:'' }}" placeholder="Search leads, orders..."
+                       autocomplete="off" spellcheck="false" aria-label="Search"
+                       aria-expanded="false" aria-controls="searchSuggest"
+                       style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-main);">
+                <div id="searchSuggest" class="search-suggest" role="listbox" aria-label="Search suggestions" hidden></div>
+            </div>
+        </form>
     </div>
 
     <div class="d-flex align-items-center gap-3">
@@ -256,6 +262,161 @@ document.addEventListener("DOMContentLoaded", function () {
                 !topbarSearch.contains(e.target) && e.target !== searchToggle) {
                 topbarSearch.classList.remove('topbar-search--open');
             }
+        });
+    }
+
+    /* ── Global search: type-ahead suggestions (Phase 4B) ──
+       The dropdown DOM is built with textContent only, never innerHTML,
+       so a result value can never inject HTML into the page. */
+    const searchForm  = document.getElementById('topbarSearchForm');
+    const searchInput = document.getElementById('topbarSearchInput');
+    const suggestBox  = document.getElementById('searchSuggest');
+
+    if (searchForm && searchInput && suggestBox) {
+        const SUGGEST_MIN = 2;
+        const SUGGEST_DELAY = 250;
+        let suggestTimer = null;
+        let suggestItems = [];
+        let activeIndex = -1;
+        let suggestController = null;
+
+        function closeSuggest() {
+            suggestBox.hidden = true;
+            suggestBox.textContent = '';
+            searchInput.setAttribute('aria-expanded', 'false');
+            suggestItems = [];
+            activeIndex = -1;
+        }
+
+        function renderSuggest(data) {
+            suggestBox.textContent = '';
+            suggestItems = [];
+            activeIndex = -1;
+
+            const groups = (data && data.groups) || [];
+            if (groups.length === 0) {
+                const empty = document.createElement('div');
+                empty.className = 'search-suggest-empty';
+                empty.textContent = 'No matches found';
+                suggestBox.appendChild(empty);
+                suggestBox.hidden = false;
+                searchInput.setAttribute('aria-expanded', 'true');
+                return;
+            }
+
+            groups.forEach(function (group) {
+                const heading = document.createElement('div');
+                heading.className = 'search-suggest-group';
+                heading.textContent = group.label;
+                suggestBox.appendChild(heading);
+
+                (group.items || []).forEach(function (item) {
+                    const row = document.createElement('a');
+                    row.className = 'search-suggest-item';
+                    row.href = item.url;
+                    row.setAttribute('role', 'option');
+
+                    const icon = document.createElement('i');
+                    icon.className = 'bi ' + group.icon;
+
+                    const body = document.createElement('div');
+                    body.className = 'search-suggest-body';
+
+                    const title = document.createElement('div');
+                    title.className = 'search-suggest-title';
+                    title.textContent = item.title;
+                    body.appendChild(title);
+
+                    if (item.subtitle) {
+                        const sub = document.createElement('div');
+                        sub.className = 'search-suggest-sub';
+                        sub.textContent = item.subtitle;
+                        body.appendChild(sub);
+                    }
+
+                    row.appendChild(icon);
+                    row.appendChild(body);
+                    row.addEventListener('click', closeSuggest);
+                    suggestBox.appendChild(row);
+                    suggestItems.push(row);
+                });
+            });
+
+            suggestBox.hidden = false;
+            searchInput.setAttribute('aria-expanded', 'true');
+        }
+
+        function highlight(index, direction) {
+            const rows = suggestBox.querySelectorAll('.search-suggest-item');
+            const count = rows.length;
+            if (count === 0) { return; }
+            activeIndex = direction > 0
+                ? (activeIndex + 1) % count
+                : (activeIndex - 1 + count) % count;
+            rows.forEach(function (row, i) {
+                const isActive = i === activeIndex;
+                row.classList.toggle('active', isActive);
+                if (isActive) { row.scrollIntoView({ block: 'nearest' }); }
+            });
+        }
+
+        function fetchSuggest(query) {
+            if (suggestController) { suggestController.abort(); }
+            const controller = new AbortController();
+            suggestController = controller;
+
+            fetch('/search/suggest/?q=' + encodeURIComponent(query), {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                signal: controller.signal
+            })
+                .then(function (response) {
+                    if (!response.ok) { throw new Error('suggest failed'); }
+                    return response.json();
+                })
+                .then(function (data) {
+                    // Ignore stale responses for text the user has moved on from.
+                    if (searchInput.value.trim() !== query) { return; }
+                    renderSuggest(data);
+                })
+                .catch(function () { /* aborted / offline / throttled: keep last */ });
+        }
+
+        searchInput.addEventListener('input', function () {
+            const query = searchInput.value.trim();
+            if (suggestTimer) { clearTimeout(suggestTimer); }
+            if (query.length < SUGGEST_MIN) { closeSuggest(); return; }
+            suggestTimer = setTimeout(function () { fetchSuggest(query); }, SUGGEST_DELAY);
+        });
+
+        searchInput.addEventListener('keydown', function (e) {
+            if (suggestBox.hidden) { return; }
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                highlight(activeIndex, 1);
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                highlight(activeIndex, -1);
+            } else if (e.key === 'Enter') {
+                if (activeIndex >= 0 && suggestItems[activeIndex]) {
+                    e.preventDefault();
+                    window.location.href = suggestItems[activeIndex].href;
+                }
+            } else if (e.key === 'Escape') {
+                closeSuggest();
+            }
+        });
+
+        document.addEventListener('click', function (e) {
+            if (!suggestBox.hidden && !suggestBox.contains(e.target) && e.target !== searchInput) {
+                closeSuggest();
+            }
+        });
+
+        searchInput.addEventListener('blur', function () {
+            setTimeout(function () {
+                if (document.activeElement !== searchInput) { closeSuggest(); }
+            }, 150);
         });
     }
 

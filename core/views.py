@@ -13,6 +13,8 @@ from django.template.loader import render_to_string
 from django.contrib.staticfiles.storage import staticfiles_storage
 from django.urls import reverse
 from django.utils import timezone
+from django.utils.http import urlencode
+from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
 from partners.utils import get_partner_profile
 
@@ -418,3 +420,313 @@ def notifications_mark_read(request):
     nr.last_read_at = timezone.now()
     nr.save(update_fields=['last_read_at'])
     return JsonResponse({'status': 'ok'})
+
+
+# ─────────────────────────────────────────
+#  Global search (Phase 4B)
+# ─────────────────────────────────────────
+
+SEARCH_MIN_LENGTH = 2          # characters required before we hit the DB
+SEARCH_RESULT_LIMIT = 50       # max rows fetched per group on the results page
+SEARCH_SUGGEST_LIMIT = 5       # max rows per group in the type-ahead dropdown
+SEARCH_SUGGEST_THROTTLE = 60   # suggestions allowed per user per window
+SEARCH_SUGGEST_WINDOW = 60     # throttle window, in seconds
+
+
+def _search_list_url(view_name, query):
+    """Link to an existing list page, preserving the query string."""
+    return reverse(view_name) + '?' + urlencode({'q': query})
+
+
+def _item(title, subtitle, url, status=None, status_label=None):
+    return {
+        'title': title or '',
+        'subtitle': subtitle or '',
+        'url': url,
+        'status': status,
+        'status_label': status_label,
+    }
+
+
+def _rank(items, query):
+    """Float exact (case-insensitive) title matches to the top of a group."""
+    needle = query.casefold()
+    return sorted(items, key=lambda i: 0 if i['title'].casefold() == needle else 1)
+
+
+def _group(key, label, icon, color, items, total, list_name, query):
+    return {
+        'key': key,
+        'label': label,
+        'icon': icon,
+        'color': color,
+        'items': _rank(items, query),
+        'total': total,
+        'list_url': _search_list_url(list_name, query),
+    }
+
+
+def _search_groups(user, query, limit):
+    """Build the grouped result set for ``query``, scoped to ``user``.
+
+    Reuses the same role scoping as the list views: staff see everything,
+    partners only their own records (plus content shared with them). Soft
+    deleted rows are excluded automatically by the default managers.
+    """
+    from django.contrib.auth.models import User
+    from django.db.models import Count, Q
+    from leads.models import Lead
+    from orders.models import Order
+    from support.models import Ticket
+    from partners.models import PartnerDocument, PartnerProfile
+    from portal_content.models import Announcement, Document
+
+    is_staff = user.is_staff
+    profile = None if is_staff else get_partner_profile(user)
+    groups = []
+
+    # ── Leads (customer name / phone / product) ──
+    leads = Lead.objects.select_related('partner')
+    if not is_staff:
+        leads = leads.filter(partner=profile)
+    leads = leads.filter(
+        Q(customer_name__icontains=query)
+        | Q(customer_phone__icontains=query)
+        | Q(product_interest__icontains=query)
+    ).order_by('-created_at')
+    lead_total = leads.count()
+    groups.append(_group(
+        'leads', 'Leads', 'bi-person-lines-fill', 'primary',
+        [
+            _item(
+                l.customer_name,
+                ((l.partner.company_name + ' · ') if l.partner else '') + l.product_interest,
+                reverse('lead_update', args=[l.pk]),
+                l.status, l.get_status_display(),
+            )
+            for l in leads[:limit]
+        ],
+        lead_total, 'lead_list', query,
+    ))
+
+    # ── Orders (order number / partner company) ──
+    orders = Order.objects.select_related('partner', 'lead')
+    if not is_staff:
+        orders = orders.filter(partner=profile)
+    orders = orders.filter(
+        Q(order_number__icontains=query)
+        | Q(partner__company_name__icontains=query)
+    ).order_by('-created_at')
+    order_total = orders.count()
+    groups.append(_group(
+        'orders', 'Orders', 'bi-cart-check', 'success',
+        [
+            _item(
+                'Order #' + o.order_number,
+                f'{o.partner.company_name} · ₹{o.amount:.2f}',
+                reverse('order_update', args=[o.pk]) if is_staff else reverse('order_list'),
+                o.status, o.get_status_display(),
+            )
+            for o in orders[:limit]
+        ],
+        order_total, 'order_list', query,
+    ))
+
+    # ── Support tickets (subject / description) ──
+    tickets = Ticket.objects.select_related('partner')
+    if not is_staff:
+        tickets = tickets.filter(partner=profile)
+    tickets = tickets.filter(
+        Q(subject__icontains=query) | Q(description__icontains=query)
+    ).order_by('-created_at')
+    ticket_total = tickets.count()
+    groups.append(_group(
+        'tickets', 'Support Tickets', 'bi-headset', 'warning',
+        [
+            _item(
+                t.subject,
+                t.partner.company_name,
+                reverse('ticket_detail', args=[t.pk]),
+                t.status, t.get_status_display(),
+            )
+            for t in tickets[:limit]
+        ],
+        ticket_total, 'ticket_list', query,
+    ))
+
+    # ── KYC documents (partner company / OCR text / type) ──
+    kyc = PartnerDocument.objects.select_related('partner')
+    if not is_staff:
+        kyc = kyc.filter(partner=profile)
+    kyc = kyc.filter(
+        Q(partner__company_name__icontains=query)
+        | Q(ocr_text__icontains=query)
+        | Q(doc_type__icontains=query)
+    ).order_by('-uploaded_at')
+    kyc_total = kyc.count()
+    # Reuse the shared badge partial: map review states onto colours it knows.
+    kyc_badge = {'pending': 'PENDING', 'approved': 'CONVERTED', 'rejected': 'LOST'}
+    groups.append(_group(
+        'kyc', 'KYC Documents', 'bi-file-earmark-person', 'info',
+        [
+            _item(
+                f'{d.partner.company_name} — {d.get_doc_type_display()}',
+                'KYC · ' + d.get_review_status_display(),
+                reverse('kyc_document_detail', args=[d.pk]) if is_staff
+                else reverse('kyc_document_list'),
+                kyc_badge.get(d.review_status), d.get_review_status_display(),
+            )
+            for d in kyc[:limit]
+        ],
+        kyc_total, 'kyc_document_list', query,
+    ))
+
+    # ── Announcements (title / content) ──
+    announcements = Announcement.objects.filter(is_active=True)
+    if not is_staff:
+        announcements = announcements.annotate(vcount=Count('visible_to')).filter(
+            Q(vcount=0) | Q(visible_to=profile)
+        )
+    announcements = announcements.filter(
+        Q(title__icontains=query) | Q(content__icontains=query)
+    ).distinct().order_by('-created_at')
+    ann_total = announcements.count()
+    groups.append(_group(
+        'announcements', 'Announcements', 'bi-megaphone', 'warning',
+        [
+            _item(a.title, a.content[:90], reverse('announcement_list'))
+            for a in announcements[:limit]
+        ],
+        ann_total, 'announcement_list', query,
+    ))
+
+    # ── Resources: documents (title) ──
+    documents = Document.objects.all()
+    if not is_staff:
+        documents = documents.annotate(vcount=Count('visible_to')).filter(
+            Q(vcount=0) | Q(visible_to=profile)
+        )
+    documents = documents.filter(title__icontains=query).distinct().order_by('-uploaded_at')
+    doc_total = documents.count()
+    groups.append(_group(
+        'documents', 'Documents', 'bi-folder2-open', 'primary',
+        [
+            _item(d.title, 'Resource · ' + d.file_size_display,
+                  reverse('document_download', args=[d.pk]))
+            for d in documents[:limit]
+        ],
+        doc_total, 'document_list', query,
+    ))
+
+    # ── Staff-only: partner profiles ──
+    if is_staff:
+        partners = PartnerProfile.objects.select_related('user').filter(
+            Q(company_name__icontains=query)
+            | Q(user__username__icontains=query)
+            | Q(user__email__icontains=query)
+            | Q(phone_number__icontains=query)
+        ).order_by('-created_at')
+        partner_total = partners.count()
+        groups.append(_group(
+            'partners', 'Partners', 'bi-buildings', 'secondary',
+            [
+                _item(
+                    p.company_name,
+                    p.user.username + ((' · ' + p.user.email) if p.user.email else ''),
+                    reverse('partner_update', args=[p.pk]),
+                    'COMPLETED' if p.is_approved else 'PENDING',
+                    'Approved' if p.is_approved else 'Pending',
+                )
+                for p in partners[:limit]
+            ],
+            partner_total, 'partner_list', query,
+        ))
+
+    # ── Staff-only: users ──
+    if is_staff:
+        users = User.objects.filter(is_active=True).filter(
+            Q(username__icontains=query)
+            | Q(email__icontains=query)
+            | Q(first_name__icontains=query)
+            | Q(last_name__icontains=query)
+        ).order_by('-date_joined')
+        user_total = users.count()
+        groups.append(_group(
+            'users', 'Users', 'bi-person-badge', 'secondary',
+            [
+                _item(u.username, u.email or u.get_full_name(),
+                      reverse('user_update', args=[u.pk]))
+                for u in users[:limit]
+            ],
+            user_total, 'user_list', query,
+        ))
+
+    return groups
+
+
+@login_required(login_url='/login/')
+def search(request):
+    """Grouped, permission-aware global search results page."""
+    query = (request.GET.get('q') or '').strip()
+    context = {
+        'query': query,
+        'groups': [],
+        'total': 0,
+        'min_length': SEARCH_MIN_LENGTH,
+        'too_short': 0 < len(query) < SEARCH_MIN_LENGTH,
+    }
+    if len(query) >= SEARCH_MIN_LENGTH:
+        context['groups'] = [
+            g for g in _search_groups(request.user, query, SEARCH_RESULT_LIMIT)
+            if g['total']
+        ]
+        context['total'] = sum(g['total'] for g in context['groups'])
+    return render(request, 'search.html', context)
+
+
+def _suggest_throttled(user):
+    """Simple fixed-window rate limit: 60 suggestions / minute / user."""
+    window = int(timezone.now().timestamp()) // SEARCH_SUGGEST_WINDOW
+    key = 'search-suggest:%s:%s' % (user.pk, window)
+    try:
+        current = cache.get(key, 0)
+        if current >= SEARCH_SUGGEST_THROTTLE:
+            return True
+        cache.set(key, current + 1, SEARCH_SUGGEST_WINDOW * 2)
+    except Exception:
+        # Never let a cache outage break search.
+        return False
+    return False
+
+
+@login_required(login_url='/login/')
+def search_suggest(request):
+    """Type-ahead JSON for the top-bar dropdown (same permission rules)."""
+    query = (request.GET.get('q') or '').strip()
+    if len(query) < SEARCH_MIN_LENGTH:
+        return JsonResponse({'query': query, 'total': 0, 'groups': []})
+
+    if _suggest_throttled(request.user):
+        return JsonResponse(
+            {'error': 'Too many search requests. Please slow down.'}, status=429
+        )
+
+    groups = []
+    for g in _search_groups(request.user, query, SEARCH_SUGGEST_LIMIT):
+        if not g['items']:
+            continue
+        groups.append({
+            'key': g['key'],
+            'label': g['label'],
+            'icon': g['icon'],
+            'items': [
+                {'title': i['title'], 'subtitle': i['subtitle'], 'url': i['url']}
+                for i in g['items']
+            ],
+        })
+
+    return JsonResponse({
+        'query': query,
+        'total': sum(len(g['items']) for g in groups),
+        'groups': groups,
+    })

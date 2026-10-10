@@ -7,6 +7,10 @@ urlpatterns = [
     path('service-worker.js', views.service_worker, name='service_worker'),
     path('offline/', views.offline, name='offline'),
 
+    # Global search (Phase 4B)
+    path('search/', views.search, name='search'),
+    path('search/suggest/', views.search_suggest, name='search_suggest'),
+
     path('recycle-bin/', views.recycle_bin, name='recycle_bin'),
     path('recycle-bin/restore/<str:model_name>/<int:pk>/', views.restore_item, name='restore_item'),
     path('recycle-bin/delete/<str:model_name>/<int:pk>/', views.hard_delete_item, name='hard_delete_item'),
