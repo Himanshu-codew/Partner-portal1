@@ -76,22 +76,23 @@
                             <div class="fw-semibold text-dark">{{ ticket.partner.company_name }}</div>
                         </td>
                         <td>
+                            {% if request.user.is_staff %}
+                            <form action="{% url 'ticket_update_status' ticket.id %}" method="post" class="mb-0">
+                                {% csrf_token %}
+                                <select name="status" class="form-select form-select-sm shadow-sm" onchange="this.form.submit()" style="width: 150px; border-radius: 20px; font-size: 0.85rem;">
+                                    {% for key, val in statuses.items %}
+                                    <option value="{{ key }}" {% if ticket.status == key %}selected{% endif %}>{{ val }}</option>
+                                    {% endfor %}
+                                </select>
+                            </form>
+                            {% else %}
                             {% include 'includes/status_badge.html' with status=ticket.status label=ticket.get_status_display %}
+                            {% endif %}
                         </td>
                         <td>{{ ticket.created_at|date:"M d, Y H:i" }}</td>
                         <td>{{ ticket.updated_at|date:"M d, Y H:i" }}</td>
                         <td class="text-end pe-4">
                             <div class="d-flex gap-2 justify-content-end align-items-center">
-                                {% if request.user.is_staff %}
-                                    <form action="{% url 'ticket_update_status' ticket.id %}" method="post" class="mb-0">
-                                        {% csrf_token %}
-                                        <select name="status" class="form-select form-select-sm" onchange="this.form.submit()" style="width: auto;">
-                                            {% for key, val in statuses.items %}
-                                            <option value="{{ key }}" {% if ticket.status == key %}selected{% endif %}>{{ val }}</option>
-                                            {% endfor %}
-                                        </select>
-                                    </form>
-                                {% endif %}
                                 <a href="{% url 'ticket_update' ticket.pk %}" class="btn btn-sm btn-outline-primary" data-bs-toggle="tooltip" title="Edit"><i class="bi bi-pencil"></i></a>
                                 <button type="button" class="btn btn-sm btn-outline-danger" data-bs-toggle="modal" data-bs-target="#confirmModal" data-action-url="{% url 'ticket_delete' ticket.pk %}" data-message="Are you sure you want to delete ticket '{{ ticket.subject }}'?" data-title="Delete Ticket" title="Delete"><i class="bi bi-trash"></i></button>
                             </div>
