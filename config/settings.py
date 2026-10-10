@@ -184,6 +184,19 @@ STORAGES = {
     },
 }
 
+# Tests run without `collectstatic`, so the manifest hash lookup would fail for
+# any asset. Use the plain static storage under `manage.py test` only.
+if 'test' in sys.argv:
+    STORAGES['staticfiles']['BACKEND'] = (
+        'django.contrib.staticfiles.storage.StaticFilesStorage'
+    )
+
+# During local development don't hard-fail on a stale/absent static manifest,
+# so `runserver` keeps working after a new asset is added. Production builds
+# run `collectstatic`, so this never affects the deployed manifest.
+if DEBUG:
+    STATICFILES_MANIFEST_STRICT = False
+
 
 # ─────────────────────────────────────────────────────────────
 # 6. Email Configuration (Brevo HTTPS API — SMTP is blocked on Render free tier)

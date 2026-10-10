@@ -1,14 +1,101 @@
+import json
+
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
 from django.views.decorators.http import require_POST
 from django.contrib import messages
 from django.apps import apps
+from django.conf import settings
 from django.core.exceptions import PermissionDenied
 from django.contrib.auth.models import User
-from django.http import JsonResponse
+from django.http import HttpResponse, JsonResponse
+from django.template.loader import render_to_string
+from django.contrib.staticfiles.storage import staticfiles_storage
+from django.urls import reverse
 from django.utils import timezone
 from django.views.decorators.csrf import csrf_exempt
 from partners.utils import get_partner_profile
+
+
+# ─────────────────────────────────────────
+#  PWA — manifest, service worker, offline (Phase 4A)
+# ─────────────────────────────────────────
+
+# Brand colours pulled from the sidebar tokens in static/css/portal.css.
+PWA_THEME_COLOR = '#1e293b'       # dark navy
+PWA_BACKGROUND_COLOR = '#0f172a'  # darker navy
+SERVICE_WORKER_CACHE_VERSION = 'v1'
+
+
+def _static(name):
+    """Resolve a static asset to a URL (hashed in production, plain in dev).
+
+    Falls back to an un-hashed URL when no manifest exists yet (local dev,
+    tests without a ``collectstatic`` run), so the PWA endpoints never crash.
+    """
+    try:
+        url = staticfiles_storage.url(name)
+    except Exception:
+        url = settings.STATIC_URL + name
+    if not url.startswith('/'):
+        url = '/' + url
+    return url
+
+
+def web_manifest(request):
+    """Serve the web app manifest at /manifest.webmanifest (public)."""
+    def icon(name, sizes, purpose=None):
+        entry = {'src': _static(name), 'sizes': sizes, 'type': 'image/png'}
+        if purpose:
+            entry['purpose'] = purpose
+        return entry
+
+    manifest = {
+        'name': 'Partner Portal',
+        'short_name': 'Portal',
+        'start_url': '/',
+        'scope': '/',
+        'display': 'standalone',
+        'background_color': PWA_BACKGROUND_COLOR,
+        'theme_color': PWA_THEME_COLOR,
+        'icons': [
+            icon('icons/icon-192.png', '192x192'),
+            icon('icons/icon-512.png', '512x512'),
+            icon('icons/icon-maskable-512.png', '512x512', 'maskable'),
+            {'src': _static('icons/icon.svg'), 'sizes': 'any',
+             'type': 'image/svg+xml'},
+        ],
+    }
+    return JsonResponse(manifest, content_type='application/manifest+json')
+
+
+def service_worker(request):
+    """Serve the service worker from the site root (public).
+
+    The worker must control the whole origin, hence the
+    ``Service-Worker-Allowed: /`` header. It is never cached.
+    """
+    precache_urls = [
+        reverse('offline'),
+        reverse('web_manifest'),
+        _static('css/portal.css'),
+        _static('icons/icon-192.png'),
+        _static('icons/icon-512.png'),
+    ]
+    content = render_to_string('service-worker.js', {
+        'cache_version': SERVICE_WORKER_CACHE_VERSION,
+        'precache_urls_json': json.dumps(precache_urls),
+        'offline_url': reverse('offline'),
+    })
+    response = HttpResponse(content, content_type='application/javascript')
+    response['Service-Worker-Allowed'] = '/'
+    response['Cache-Control'] = 'no-cache'
+    return response
+
+
+def offline(request):
+    """Public offline fallback page (no login required)."""
+    return render(request, 'offline.html')
 
 
 def get_soft_deleted_models():

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Partner Portal">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#1e293b"/>
+      <stop offset="1" stop-color="#0f172a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <circle cx="256" cy="256" r="174" fill="#3b82f6"/>
+  <text x="256" y="256" fill="#ffffff" font-family="Arial, Helvetica, sans-serif"
+        font-size="230" font-weight="bold" text-anchor="middle"
+        dominant-baseline="central">P</text>
+</svg>

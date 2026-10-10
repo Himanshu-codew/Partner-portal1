@@ -676,3 +676,120 @@ form textarea:focus {
 [data-theme="dark"] .border { border-color: var(--border) !important; }
 [data-theme="dark"] .border-bottom { border-bottom-color: var(--border) !important; }
 [data-theme="dark"] .border-top    { border-top-color:    var(--border) !important; }
+
+/* ═══════════════════════════════════════════════
+   PWA + MOBILE USABILITY  (Phase 4A)
+══════════════════════════════════════════════ */
+/* The page body never scrolls horizontally — wide tables scroll inside
+   .table-responsive instead. `clip` (not `hidden`) keeps the sticky
+   topbar working. */
+html, body { max-width: 100%; }
+body { overflow-x: clip; }
+
+/* Core static assets are safe to precache (see service-worker.js). */
+.table-responsive {
+    -webkit-overflow-scrolling: touch;
+    overflow-x: auto;
+}
+.table-responsive > .table { margin-bottom: 0; }
+
+/* Charts keep their fixed height and never exceed the card width. */
+.chart-box { max-width: 100%; }
+
+/* iOS safe areas on fixed / edge-anchored chrome */
+.sidebar {
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+}
+.topbar {
+    padding-top: env(safe-area-inset-top);
+}
+.offcanvas-start {
+    padding-bottom: env(safe-area-inset-bottom);
+}
+@media (max-width: 575.98px) {
+    .notif-dropdown {
+        width: auto;
+        min-width: min(320px, calc(100vw - 16px));
+    }
+}
+
+/* Top bar search: expands below the bar on phones */
+@media (max-width: 575.98px) {
+    #topbarSearch.topbar-search--open {
+        display: flex !important;
+        position: absolute;
+        left: 8px;
+        right: 8px;
+        top: 100%;
+        width: calc(100% - 16px);
+        padding: 8px 12px;
+        margin-top: 4px;
+        background-color: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        z-index: 1029;
+    }
+    #topbarSearch.topbar-search--open .form-control { background-color: var(--surface-2) !important; }
+}
+
+/* ── Mobile page layout polish ── */
+@media (max-width: 767.98px) {
+    /* Page headers: stack, actions become full width */
+    .content-area > .d-flex.justify-content-between,
+    .content-area > .mb-4.d-flex.justify-content-between {
+        flex-direction: column;
+        align-items: stretch !important;
+        gap: 0.5rem;
+    }
+    .content-area > .d-flex.justify-content-between > div,
+    .content-area > .mb-4.d-flex.justify-content-between > div {
+        width: 100%;
+    }
+    .content-area > .d-flex.justify-content-between .btn,
+    .content-area > .mb-4.d-flex.justify-content-between .btn,
+    .content-area .card-header form.d-flex .btn {
+        width: 100%;
+    }
+
+    /* Filter forms: wrap and fill the card width */
+    .content-area .card-header form.d-flex {
+        flex-wrap: wrap;
+    }
+    .content-area .card-header form.d-flex > .input-group,
+    .content-area .card-header form.d-flex > .form-control,
+    .content-area .card-header form.d-flex > .form-select,
+    .content-area .card-header form.d-flex > select {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    /* 44px minimum tap targets for form controls + their buttons */
+    .content-area .form-control,
+    .content-area .form-select,
+    .content-area textarea,
+    .content-area form .btn,
+    .content-area .page-header .btn,
+    .content-area .card-header form .btn {
+        min-height: 44px;
+    }
+
+    /* Modals always fit the viewport */
+    .modal-dialog {
+        max-width: calc(100vw - 16px);
+        margin: 8px auto;
+    }
+    .modal-dialog .modal-content {
+        max-height: calc(100vh - 16px);
+        overflow-y: auto;
+    }
+}
+
+/* Stat cards: 1 column on phones, 2 on tablets (laptops get 3-4).
+   Dashboard already uses col-sm-6 col-xl-3; this only guards the corner
+   case of an extra-large value forcing a card wider than its column. */
+@media (max-width: 575.98px) {
+    .stat-card { min-width: 0; }
+    .stat-card .card-body { padding: 1rem; }
+}

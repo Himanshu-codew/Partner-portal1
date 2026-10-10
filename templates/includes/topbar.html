@@ -8,8 +8,14 @@
             <i class="bi bi-list"></i>
         </button>
 
+        <!-- Search toggle: becomes an icon on the smallest screens -->
+        <button id="searchToggle" class="btn border-0 p-0 fs-5 d-sm-none me-2" type="button"
+                style="color: var(--text-muted);" aria-label="Search" title="Search">
+            <i class="bi bi-search"></i>
+        </button>
+
         <!-- Search Input -->
-        <div class="input-group d-none d-sm-flex" style="width: 250px;">
+        <div id="topbarSearch" class="input-group d-none d-sm-flex" style="width: 250px;">
             <span class="input-group-text border-end-0"
                   style="background-color: var(--surface-2) !important; border-color: var(--border) !important; color: var(--text-muted);">
                 <i class="bi bi-search"></i>
@@ -73,6 +79,14 @@
                     <div class="small" style="color: var(--text-muted);">{{ request.user.email }}</div>
                 </li>
                 <li><a class="dropdown-item" href="{% url 'profile' %}"><i class="bi bi-person me-2"></i>Profile</a></li>
+                <li id="installAppItem" class="d-none">
+                    <button id="installAppBtn" class="dropdown-item" type="button">
+                        <i class="bi bi-download me-2"></i>Install app
+                    </button>
+                </li>
+                <li id="iosInstallHint" class="d-none">
+                    <span class="dropdown-item-text small text-muted"><i class="bi bi-apple me-2"></i>To install: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</span>
+                </li>
                 <li><hr class="dropdown-divider"></li>
                 <li>
                     <form action="{% url 'logout' %}" method="post">
@@ -225,5 +239,60 @@ document.addEventListener("DOMContentLoaded", function () {
             notifBadge.style.display = 'none';
         }
     });
+
+    /* ── Mobile search: icon expands to full width ── */
+    const searchToggle = document.getElementById('searchToggle');
+    const topbarSearch = document.getElementById('topbarSearch');
+    if (searchToggle && topbarSearch) {
+        searchToggle.addEventListener('click', function () {
+            const isOpen = topbarSearch.classList.toggle('topbar-search--open');
+            if (isOpen) {
+                const input = topbarSearch.querySelector('input');
+                setTimeout(() => input && input.focus(), 0);
+            }
+        });
+        document.addEventListener('click', function (e) {
+            if (topbarSearch.classList.contains('topbar-search--open') &&
+                !topbarSearch.contains(e.target) && e.target !== searchToggle) {
+                topbarSearch.classList.remove('topbar-search--open');
+            }
+        });
+    }
+
+    /* ── Install app (PWA) ── */
+    let deferredPrompt = null;
+    const installItem = document.getElementById('installAppItem');
+    const installBtn = document.getElementById('installAppBtn');
+
+    window.addEventListener('beforeinstallprompt', function (e) {
+        e.preventDefault();
+        deferredPrompt = e;
+        if (installItem) { installItem.classList.remove('d-none'); }
+    });
+
+    if (installBtn) {
+        installBtn.addEventListener('click', async function () {
+            if (!deferredPrompt) return;
+            deferredPrompt.prompt();
+            try { await deferredPrompt.userChoice; } catch (err) { /* dismissed */ }
+            deferredPrompt = null;
+            if (installItem) { installItem.classList.add('d-none'); }
+        });
+    }
+
+    window.addEventListener('appinstalled', function () {
+        deferredPrompt = null;
+        if (installItem) { installItem.classList.add('d-none'); }
+    });
+
+    /* ── iOS hint: only Safari, only when not already installed ── */
+    const isIos = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    const alreadyInstalled =
+        window.navigator.standalone === true ||
+        (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches);
+    const iosHint = document.getElementById('iosInstallHint');
+    if (isIos && !alreadyInstalled && iosHint) {
+        iosHint.classList.remove('d-none');
+    }
 });
 </script>

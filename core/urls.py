@@ -2,6 +2,11 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    # PWA (Phase 4A) — all public, served from the site root
+    path('manifest.webmanifest', views.web_manifest, name='web_manifest'),
+    path('service-worker.js', views.service_worker, name='service_worker'),
+    path('offline/', views.offline, name='offline'),
+
     path('recycle-bin/', views.recycle_bin, name='recycle_bin'),
     path('recycle-bin/restore/<str:model_name>/<int:pk>/', views.restore_item, name='restore_item'),
     path('recycle-bin/delete/<str:model_name>/<int:pk>/', views.hard_delete_item, name='hard_delete_item'),

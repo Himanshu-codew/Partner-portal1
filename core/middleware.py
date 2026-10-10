@@ -30,6 +30,9 @@ class PartnerApprovalMiddleware:
                 
                 # Build allowed prefixes
                 allowed_prefixes = ['/static/', '/media/']
+                # PWA assets must be reachable while waiting for approval so the
+                # installable app and its offline page keep working.
+                allowed_prefixes += ['/manifest.webmanifest', '/service-worker.js', '/offline/']
                 # Password reset pages must stay reachable while waiting for
                 # approval (matched as prefixes because the confirm URL carries
                 # uid/token arguments).

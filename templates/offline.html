@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+    <meta name="theme-color" content="#1e293b">
+    <link rel="manifest" href="/manifest.webmanifest">
+    <title>Offline | Partner Portal</title>
+    <style>
+        :root {
+            --bg: #0f172a;
+            --surface: #1e293b;
+            --primary: #3b82f6;
+            --text: #e2e8f0;
+            --muted: #94a3b8;
+        }
+        * { box-sizing: border-box; }
+        html, body { height: 100%; margin: 0; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: linear-gradient(180deg, #1e293b 0%, #0f172a 100%);
+            color: var(--text);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px;
+            padding-bottom: calc(24px + env(safe-area-inset-bottom));
+            text-align: center;
+        }
+        .card {
+            background: var(--surface);
+            border: 1px solid #334155;
+            border-radius: 16px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.4);
+            padding: 40px 28px;
+            max-width: 420px;
+            width: 100%;
+        }
+        .mark {
+            width: 72px; height: 72px; border-radius: 50%;
+            background: var(--primary); color: #fff;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 2rem; font-weight: 700; margin: 0 auto 20px;
+        }
+        h1 { font-size: 1.4rem; margin: 0 0 8px; }
+        p { color: var(--muted); margin: 0 0 24px; line-height: 1.5; }
+        button {
+            background: var(--primary);
+            color: #fff;
+            border: 0;
+            border-radius: 10px;
+            padding: 14px 24px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            width: 100%;
+            min-height: 44px;
+        }
+        button:active { transform: translateY(1px); }
+    </style>
+</head>
+<body>
+    <main class="card">
+        <div class="mark">P</div>
+        <h1>You're offline</h1>
+        <p>Partner Portal needs a connection to load your live data. Check your network and try again.</p>
+        <button type="button" onclick="window.location.reload()">Retry</button>
+    </main>
+    <script>
+        if ('serviceWorker' in navigator) {
+            navigator.serviceWorker.register('/service-worker.js', { scope: '/' }).catch(function () {});
+        }
+    </script>
+</body>
+</html>
