@@ -20,6 +20,7 @@ From verified code (`config/settings.py`, `build.sh`):
 | `ALLOWED_HOSTS` | Optional | Comma-separated hostnames. `RENDER_EXTERNAL_HOSTNAME` added automatically. |
 | `CSRF_TRUSTED_ORIGINS` | Optional | Comma-separated origins (https://...). Render hostname origin added. |
 | `DATABASE_URL` | Yes (prod) | Postgres URL (psycopg2-binary). If absent, uses SQLite locally. |
+| `DB_DISABLE_SERVER_SIDE_CURSORS` | Optional | Set `True` to force client-side cursors globally. Recommended on Neon (especially behind a pooler) to avoid dropped named cursors during `dumpdata` / `queryset.iterator()`. Default `False`. |
 | `DEFAULT_FROM_EMAIL` | Optional | Sender for notifications/password reset emails. |
 | `BREVO_API_KEY` | Yes if using Brevo email | Enables Brevo HTTPS API backend (`core.email_backends.BrevoAPIEmailBackend`). If unset in non-DEBUG, SMTP backend selected by logic. |
 | `EMAIL_HOST/PORT/USE_TLS/USE_SSL/USER/PASS` | Optional | SMTP config when not using Brevo. |
@@ -77,6 +78,7 @@ From verified code (`config/settings.py`, `build.sh`):
 | Approval redirect loops | Unapproved partner accessing allowed paths? Check middleware exempt prefixes; `/search/` not exempt (intentional). Ensure `approval_pending` route accessible. |
 | Static manifest errors in tests/dev | Manifest strictness behavior adjusted in test contexts; in local dev run `collectstatic` after adding assets if using manifest storage. |
 | Notifications not sent but no exception | Wrapped in `transaction.on_commit` and deduped; may be suppressed by dedupe/quota or transaction rolled back. Check `NotificationLog`. |
+| `CommandError: Unable to serialize database: cursor "_django_curs_..." does not exist` | Neon/Postgres dropped a server-side (named) cursor, e.g. compute suspended or a pooler in front. `backup_data` disables server-side cursors for the dump automatically; to protect the whole app set `DB_DISABLE_SERVER_SIDE_CURSORS=True` in the environment. See `docs/BACKUP_RESTORE.md`. |
 
 ## Pre-deploy checklist
 

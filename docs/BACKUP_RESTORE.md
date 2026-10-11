@@ -61,3 +61,41 @@ Restoring is a destructive operation for the target database. Only restore into 
 - Do not commit backups to git (repo `.gitignore` excludes `backups/`, `*.backup.json`, `backup_*.json`, `*.json.bak`).
 - After taking a backup, remove/clear `$env:DATABASE_URL` from the session if sharing the shell.
 - Never print/log the database URL in any output. The command abides by this rule.
+
+## Troubleshooting
+
+### `CommandError: Unable to serialize database: cursor "_django_curs_..." does not exist`
+
+Cause: Django's `dumpdata` reads rows with `queryset.iterator()`, which uses a
+**server-side (named) cursor** on Postgres. Neon may drop that cursor — for
+example after the compute auto-suspends, or when the connection goes through a
+connection pooler (PgBouncer) that does not keep named cursors alive for the
+whole dump.
+
+What `backup_data` does now:
+- Before serialising it sets `DISABLE_SERVER_SIDE_CURSORS = True` on the
+  connection, closes the connection so the change takes effect, and restores the
+  original value afterwards (in a `finally` block).
+- If the dump still fails it deletes the partial output file and prints a short
+  error — it never prints the database URL.
+
+If you still hit it (for example other commands or long-running queries):
+
+1. Enable client-side cursors globally for the app by setting the environment
+   variable on Render and redeploying:
+   ```
+   DB_DISABLE_SERVER_SIDE_CURSORS=True
+   ```
+   (also documented in `.env.example` and `docs/RUNBOOK.md`).
+2. Prefer the Neon **direct** (non-pooled) connection string for large dumps
+   when available.
+3. Re-run the backup. A failed run leaves no partial file; a successful run
+   writes valid JSON and prints the record count and size.
+
+## Troubleshooting quick reference
+
+| Symptom | Cause | Fix |
+|---|---|---|
+| `cursor "_django_curs_..." does not exist` | Neon dropped a server-side cursor (suspend/pooler). | `backup_data` disables them automatically; set `DB_DISABLE_SERVER_SIDE_CURSORS=True` globally if needed. |
+| CommandError "already exists" | Output path already has a file. | Choose a new `--output`; the command refuses to overwrite. |
+| JSON count read fails | Output truncated / not valid JSON. | Re-run; partial file is removed automatically on failure. |

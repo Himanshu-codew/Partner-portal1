@@ -6,6 +6,7 @@ media/
 staticfiles/
 .env
 .env.*
+!.env.example
 backups/
 *.json.bak
 *.backup.json

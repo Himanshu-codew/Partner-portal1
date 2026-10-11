@@ -119,11 +119,19 @@ DATABASES = {
     }
 }
 
+# Neon/Postgres behind a pooler can drop server-side (named) cursors when the
+# compute suspends. Set DB_DISABLE_SERVER_SIDE_CURSORS=True (production) to
+# stop Django using named cursors for everything (e.g. dumpdata / iterator()).
+db_disable = os.environ.get('DB_DISABLE_SERVER_SIDE_CURSORS', 'False').lower() in ('true', '1', 't', 'yes')
 if 'DATABASE_URL' in os.environ:
     DATABASES['default'] = dj_database_url.config(
         conn_max_age=600,
         conn_health_checks=True,
     )
+
+DATABASES['default'].setdefault('DISABLE_SERVER_SIDE_CURSORS', db_disable)
+
+
 
 
 # Password validation
