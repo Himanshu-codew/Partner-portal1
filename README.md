@@ -1,73 +1,74 @@
 # Partner Portal
 
-A robust Django-based partner portal for managing leads, orders, commissions, support tickets, and announcements.
+A Django-based partner portal for managing leads, orders and commissions, support tickets, KYC documents, announcements and resources, notifications (email + in-app), recycle bin and global search, with a Progressive Web App (PWA) interface. It runs on Django 6.x, uses Bootstrap 5, a shared dark-mode-aware CSS theme (`static/css/portal.css`) and a database-backed file storage so uploads survive redeploys. Notifications and OCR run asynchronously where possible and never crash the request path.
 
 ## Features
-- **Role-based Access Control**: Distinct features for Partners and Staff/Admin users.
-- **Lead & Order Tracking**: Seamless management from prospect to converted order.
-- **Support Ticketing**: Built-in support ticketing system.
-- **Dashboard & Analytics**: Aggregate tracking of orders and leads with Chart.js visualizations.
-- **Secure Architecture**: Environment variables for sensitive configuration, strict POST-only deletions.
 
-## Local Setup
+- **Partners and staff**: role-aware access with approval gating (unapproved partners are blocked until staff approve).
+- **Leads and orders**: tracking from lead to converted order; order-level commission fields.
+- **Support tickets**: ticket threads with replies; status updates by staff and controlled visibility for partners.
+- **Announcements and documents**: portal content with visibility rules (`visible_to`) and file-size display.
+- **KYC documents with OCR**: partner uploads stored in DB, OCR suggestions generated (daemon thread after transaction commit), privacy-aware masking and status tracking.
+- **Notifications**: email (Brevo HTTPS API in production, SMTP in other cases) and in-app feed; WhatsApp channel exists but is disabled by default (sandbox/template constraints).
+- **Recycle bin**: soft-delete across SoftDeleteModel entities with restore/hard-delete and purge command.
+- **Global search**: top-bar search (GET `/search/`) with permission-aware grouped results and type-ahead suggestions.
+- **PWA**: web manifest, service worker, offline page (service worker is disabled in DEBUG in code to avoid dev caching; see `config/settings.py`/`core/views.py` and `docs/pwa.md`).
 
-1. **Clone the repository** and navigate to the project directory:
-   ```bash
-   git clone <repo-url>
-   cd "Partner portal"
-   ```
+## Tech stack
 
-2. **Create and activate a virtual environment**:
-   ```bash
-   python -m venv venv
-   # On Windows:
-   venv\Scripts\activate
-   # On Mac/Linux:
-   source venv/bin/activate
-   ```
+- Python 3.14, Django 6.1 (see `requirements.txt`).
+- Bootstrap 5 + Bootstrap Icons (CDN), Chart.js.
+- PostgreSQL on Neon (production) via `DATABASE_URL` (psycopg2-binary).
+- Email: Brevo API backend (`core.email_backends.BrevoAPIEmailBackend`) when `BREVO_API_KEY` set; else SMTP.
+- OCR: OCR.space provider (`core.services.ocr`) with daemon post-commit processing, daily limits and size cap.
+- Notifications: in-DB `NotificationLog`, dedupe/quota per channel.
+- Storage: `DatabaseFileStorage` stores uploads in `core.StoredFile` (no public disk URLs).
+- Frontend: shared `static/css/portal.css`, dark mode via CSS variables, responsive/mobile polish.
 
-3. **Install dependencies**:
-   ```bash
-   pip install -r requirements.txt
-   ```
+## Local setup (Windows PowerShell)
 
-4. **Run migrations**:
-   ```bash
-   python manage.py migrate
-   ```
+Prerequisites: Python 3.14 installed; repository at `F:\Partner portal` (current workspace).
 
-5. **Create a superuser**:
-   ```bash
-   python manage.py createsuperuser
-   ```
+```powershell
+# 1. Create and activate venv
+python -m venv venv
+.\venv\Scripts\Activate.ps1
 
-6. **Start the development server**:
-   ```bash
-   python manage.py runserver
-   ```
-   Navigate to `http://localhost:8000/`.
+# 2. Install dependencies
+pip install -r requirements.txt
 
-## Deployment (Render)
+# 3. Set environment for local dev (optional .env; DEBUG defaults to True when RENDER not present)
+$env:DJANGO_DEBUG = "True"
+$env:DJANGO_SECRET_KEY = "dev-only-insecure-key"
+# For SQLite local dev, DATABASE_URL is optional; settings use SQLite if absent.
 
-This project is configured to be deployed on [Render.com](https://render.com/).
+# 4. Migrate database
+python manage.py migrate
 
-### Required Environment Variables
-You must set the following environment variables in your Render Web Service dashboard:
-- `SECRET_KEY`: A strong, random 50-character string.
-- `DATABASE_URL`: Your Render PostgreSQL internal database URL.
-- `RENDER`: Set to `true` (Render adds this automatically).
-- `DJANGO_SUPERUSER_USERNAME`, `DJANGO_SUPERUSER_PASSWORD`, `DJANGO_SUPERUSER_EMAIL`: Used by the `build.sh` script to automatically create the master admin user on deployment.
-- `ALLOWED_HOSTS`: (Optional) Additional hosts to allow, comma-separated.
+# 5. Create a superuser
+python manage.py createsuperuser
 
-### Important Deployment Notes
+# 6. Run the development server
+python manage.py runserver
 
-- **Ephemeral File System**: On Render's free tier, the file system is ephemeral. Any files uploaded to `media/` (like portal Documents) will be lost every time the app restarts or redeploys. For production usage, it is highly recommended to configure an external storage backend like **Amazon S3** or **Cloudinary** using `django-storages`.
-- **Instance Sleeping**: On Render's free tier, the instance will spin down after 15 minutes of inactivity. The first request after a period of inactivity may take 30-60 seconds as the instance spins back up.
+# 7. Run tests (full suite)
+python manage.py test
+```
 
-### Management Commands
+Notes (verified in code):
+- DEBUG is `True` in local (no `RENDER` env), `False` when `RENDER` is present; `DJANGO_DEBUG` can override (`config/settings.py`).
+- SECRET_KEY falls back to a dev key only when DEBUG is True; in production raises `ImproperlyConfigured` if missing.
+- Database: if `DATABASE_URL` exists, uses `dj_database_url` (Postgres); otherwise defaults to `db.sqlite3`.
+- Static files: `collectstatic --no-input` runs in `build.sh`. Manifest strictness behavior is adjusted for tests in code (see settings); locally with DEBUG, `STATICFILES_MANIFEST_STRICT` may be false in certain contexts.
+- File uploads: stored via DB storage; downloads via login-required view, not public URLs.
 
-- **Recycle Bin Cleanup**: Deleted items are soft-deleted and moved to the Recycle Bin. To permanently delete items older than N days (default is 30 days), run the following command:
-  ```bash
-  python manage.py purge_recycle_bin --days 30
-  ```
-  On Render, you can schedule this as a Background Cron Job to automatically clean up old data.
+## Links to other docs
+
+- `docs/ARCHITECTURE.md` — apps, models, request flow (approval middleware), notifications, OCR pipeline, storage, PWA.
+- `docs/RUNBOOK.md` — Render deploy, env vars, secret rotation, rollback, tests, troubleshooting.
+- `docs/BACKUP_RESTORE.md` — backup/restore procedure (Neon local PowerShell session), verification, frequency, warnings.
+- `docs/CLIENT_HANDOFF.md` — decisions client must provide (hosting, domain/email auth, WhatsApp templates/number, OCR/privacy, retention/backup owner).
+- `docs/pwa.md`, `docs/ocr.md`, `docs/whatsapp.md` — feature specifics.
+
+
+ℹ️: any item marked "verify" in subsequent docs means the exact value/behaviour could not be fully extracted from the checked source at the time of writing and must be verified in the deployed environment/config.
