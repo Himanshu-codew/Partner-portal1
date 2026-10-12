@@ -148,6 +148,40 @@ def _bump_whatsapp_quota():
         cache.set(key, 1, QUOTA_TTL)
 
 
+def send_whatsapp_reply(to_e164, body):
+    """Send one free-form WhatsApp text outside the per-event pipeline.
+
+    Used for short system replies (e.g. inbound webhook acknowledgements).
+    Applies the same guards as :class:`WhatsAppChannel` — ``WHATSAPP_ENABLED``,
+    ``WHATSAPP_ALLOWED_NUMBERS`` and the daily ``NOTIFY_WHATSAPP_DAILY_LIMIT`` —
+    and never raises. Returns a :class:`ChannelResult`.
+    """
+    if not getattr(settings, 'WHATSAPP_ENABLED', False):
+        return ChannelResult('skipped', 'not configured')
+    provider = get_provider()
+    if provider is None:
+        return ChannelResult('skipped', 'not configured')
+
+    allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
+    if allowed and to_e164 not in allowed:
+        return ChannelResult('skipped', 'number not in allowed list')
+    if not _whatsapp_quota_available():
+        return ChannelResult('skipped', 'daily whatsapp limit reached')
+
+    try:
+        result = provider.send_text(to_e164, body)
+    except Exception as exc:  # noqa: BLE001 - never raise
+        logger.error('whatsapp reply failed: %s', _short(exc))
+        return ChannelResult('failed', _short(exc))
+
+    if not result.ok:
+        detail = f'{result.error_code}: {result.error_message}' if result.error_code else result.error_message
+        return ChannelResult('failed', _short(detail) or 'send failed')
+
+    _bump_whatsapp_quota()
+    return ChannelResult('sent', provider_message_id=result.message_id)
+
+
 def build_context(event, subject, user, context):
     full = dict(context)
     full.update({

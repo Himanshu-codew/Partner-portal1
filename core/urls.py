@@ -11,6 +11,9 @@ urlpatterns = [
     path('search/', views.search, name='search'),
     path('search/suggest/', views.search_suggest, name='search_suggest'),
 
+    # Inbound WhatsApp webhook (Phase 5 — 360dialog); token-guarded, no login
+    path('webhooks/whatsapp/<str:token>/', views.whatsapp_webhook, name='whatsapp_webhook'),
+
     path('recycle-bin/', views.recycle_bin, name='recycle_bin'),
     path('recycle-bin/restore/<str:model_name>/<int:pk>/', views.restore_item, name='restore_item'),
     path('recycle-bin/delete/<str:model_name>/<int:pk>/', views.hard_delete_item, name='hard_delete_item'),

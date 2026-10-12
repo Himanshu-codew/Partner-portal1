@@ -14,8 +14,8 @@ DEFAULT_MESSAGE = (
 class Command(BaseCommand):
     help = (
         'Sends one test WhatsApp message through the configured provider '
-        '(the Twilio WhatsApp sandbox). Requires WHATSAPP_ENABLED and the '
-        'Twilio settings; refuses numbers outside WHATSAPP_ALLOWED_NUMBERS.'
+        '(Twilio or 360dialog). Requires WHATSAPP_ENABLED and the provider '
+        'settings; refuses numbers outside WHATSAPP_ALLOWED_NUMBERS.'
     )
 
     def add_arguments(self, parser):
@@ -36,8 +36,9 @@ class Command(BaseCommand):
         provider = get_provider()
         if provider is None:
             raise CommandError(
-                'Twilio is not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN '
-                'and TWILIO_WHATSAPP_FROM.'
+                'WhatsApp provider is not configured. Set WHATSAPP_PROVIDER and '
+                'its credentials (Twilio: TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, '
+                'TWILIO_WHATSAPP_FROM; 360dialog: D360_API_KEY).'
             )
 
         try:
@@ -58,7 +59,7 @@ class Command(BaseCommand):
             ))
             return
 
-        detail = 'twilio {}: {}'.format(result.error_code, result.error_message) \
+        detail = '{}: {}'.format(result.error_code, result.error_message) \
             if result.error_code else result.error_message
-        # redact() guarantees no token or SID leaves the process.
+        # redact() guarantees no token, SID or API key leaves the process.
         raise CommandError('Failed to send to {}: {}'.format(number, redact(detail)))

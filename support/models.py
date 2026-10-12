@@ -50,3 +50,37 @@ class TicketReply(models.Model):
     def is_staff_reply(self):
         return self.author is None or self.author.is_staff
 
+
+class InboundWhatsAppMessage(models.Model):
+    """One inbound webhook message from the 360dialog provider.
+
+    Stored mainly for idempotency: ``wa_message_id`` is the provider message
+    id, so a re-delivered webhook is recognised and ignored. Never holds any
+    API key or credential.
+    """
+
+    STATUS_PROCESSED = 'processed'
+    STATUS_IGNORED = 'ignored'
+    STATUS_DUPLICATE = 'duplicate'
+    STATUS_CHOICES = (
+        (STATUS_PROCESSED, 'Processed'),
+        (STATUS_IGNORED, 'Ignored'),
+        (STATUS_DUPLICATE, 'Duplicate'),
+    )
+
+    wa_message_id = models.CharField(max_length=200, unique=True)
+    from_number = models.CharField(max_length=32, blank=True, default='')
+    body = models.TextField(blank=True, default='')
+    matched_ticket = models.ForeignKey(
+        Ticket, null=True, blank=True, on_delete=models.SET_NULL,
+        related_name='inbound_whatsapp_messages',
+    )
+    status = models.CharField(max_length=12, choices=STATUS_CHOICES, default=STATUS_IGNORED)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-created_at']
+
+    def __str__(self):
+        return f"{self.wa_message_id} ({self.status})"
+

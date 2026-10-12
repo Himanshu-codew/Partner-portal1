@@ -1,4 +1,7 @@
 import json
+import hmac
+import logging
+import re
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -730,3 +733,180 @@ def search_suggest(request):
         'total': sum(len(g['items']) for g in groups),
         'groups': groups,
     })
+
+
+# ─────────────────────────────────────────────────────────────
+# Inbound WhatsApp webhook (Phase 5 — 360dialog)
+# ─────────────────────────────────────────────────────────────
+wa_logger = logging.getLogger('core.whatsapp.webhook')
+
+WA_STOP_KEYWORDS = {'STOP', 'UNSUBSCRIBE', 'CANCEL'}
+WA_START_KEYWORD = 'START'
+WA_REPLY_NO_TICKET = 'No open ticket found. Please raise a ticket in the portal.'
+WA_REPLY_STOP = 'You will no longer receive WhatsApp notifications.'
+WA_REPLY_MAX_CHARS = 5000
+
+# Strip control characters (keep \t and \n) so a webhook body can never inject
+# terminal/control sequences into logs or the database.
+_CONTROL_CHARS_RE = re.compile(r'[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]')
+
+
+def _clean_wa_body(text, limit=WA_REPLY_MAX_CHARS):
+    text = _CONTROL_CHARS_RE.sub('', str(text or ''))
+    return text.strip()[:limit]
+
+
+def _iter_inbound_wa_messages(payload):
+    """Yield Cloud API messages from entry[].changes[].value.messages[]."""
+    for entry in (payload.get('entry') or []):
+        if not isinstance(entry, dict):
+            continue
+        for change in (entry.get('changes') or []):
+            if not isinstance(change, dict):
+                continue
+            value = change.get('value') or {}
+            if not isinstance(value, dict):
+                continue
+            for msg in (value.get('messages') or []):
+                if isinstance(msg, dict):
+                    yield msg
+
+
+def _record_inbound_wa(wa_id, from_number, body, status, ticket=None):
+    """Persist one inbound message for idempotency; never raises."""
+    from support.models import InboundWhatsAppMessage
+    try:
+        return InboundWhatsAppMessage.objects.create(
+            wa_message_id=str(wa_id)[:200],
+            from_number=(from_number or '')[:32],
+            body=body or '',
+            matched_ticket=ticket,
+            status=status,
+        )
+    except Exception:  # noqa: BLE001 - a race or duplicate must not 500 the hook
+        wa_logger.info('whatsapp webhook: could not record message %s', wa_id)
+        return None
+
+
+def _handle_inbound_wa_message(message):
+    """Route one inbound WhatsApp message. Never raises to the caller."""
+    from support.models import Ticket, TicketReply, InboundWhatsAppMessage
+    from partners.models import PartnerProfile
+    from core.utils import normalize_phone
+    from core.services.notifications import send_whatsapp_reply
+
+    wa_id = str(message.get('id') or '').strip()
+    if not wa_id:
+        wa_logger.info('whatsapp webhook: message without id; ignoring')
+        return
+
+    # Idempotency: a repeated provider message id is ignored.
+    if InboundWhatsAppMessage.objects.filter(wa_message_id=wa_id).exists():
+        wa_logger.info('whatsapp webhook: duplicate message %s; ignoring', wa_id)
+        return
+
+    from_number = str(message.get('from') or '').strip()
+    msg_type = str(message.get('type') or '').strip().lower()
+
+    if msg_type != 'text':
+        wa_logger.info(
+            'whatsapp webhook: non-text message (%s) from %s; ignoring',
+            msg_type or 'unknown', from_number or 'unknown',
+        )
+        _record_inbound_wa(wa_id, from_number, '', InboundWhatsAppMessage.STATUS_IGNORED)
+        return
+
+    text = message.get('text')
+    body = _clean_wa_body(text.get('body') if isinstance(text, dict) else '')
+    keyword = body.strip().upper()
+
+    try:
+        number = normalize_phone(from_number)
+    except Exception:  # noqa: BLE001 - an invalid number is simply ignored
+        wa_logger.info('whatsapp webhook: unrecognised from number; ignoring')
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_IGNORED)
+        return
+
+    profile = PartnerProfile.objects.filter(
+        whatsapp_number=number, is_approved=True
+    ).first()
+    if profile is None:
+        wa_logger.info('whatsapp webhook: no approved partner for %s; ignoring', number)
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_IGNORED)
+        return
+
+    # Opt-out keywords: turn notifications off and acknowledge once.
+    if keyword in WA_STOP_KEYWORDS:
+        if profile.whatsapp_opt_in or profile.notify_whatsapp:
+            profile.whatsapp_opt_in = False
+            profile.notify_whatsapp = False
+            profile.save(update_fields=['whatsapp_opt_in', 'notify_whatsapp'])
+        send_whatsapp_reply(number, WA_REPLY_STOP)
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_PROCESSED)
+        return
+
+    # START only re-enables delivery when the partner is still opted in.
+    if keyword == WA_START_KEYWORD:
+        if profile.whatsapp_opt_in and not profile.notify_whatsapp:
+            profile.notify_whatsapp = True
+            profile.save(update_fields=['notify_whatsapp'])
+        wa_logger.info('whatsapp webhook: START from partner %s', profile.pk)
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_PROCESSED)
+        return
+
+    if not profile.whatsapp_opt_in:
+        wa_logger.info('whatsapp webhook: partner has not opted in; ignoring')
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_IGNORED)
+        return
+
+    ticket = (
+        Ticket.objects.filter(partner=profile, status='OPEN')
+        .order_by('-updated_at')
+        .first()
+    )
+    if ticket is None:
+        wa_logger.info(
+            'whatsapp webhook: no open ticket for partner %s; replying once', profile.pk
+        )
+        send_whatsapp_reply(number, WA_REPLY_NO_TICKET)
+        _record_inbound_wa(wa_id, from_number, body, InboundWhatsAppMessage.STATUS_IGNORED)
+        return
+
+    TicketReply.objects.create(
+        ticket=ticket, author=profile.user, message=body, source='whatsapp',
+    )
+    ticket.save()  # bump updated_at
+    _record_inbound_wa(
+        wa_id, from_number, body, InboundWhatsAppMessage.STATUS_PROCESSED, ticket=ticket,
+    )
+    wa_logger.info('whatsapp webhook: added reply to ticket %s', ticket.pk)
+
+
+@csrf_exempt
+@require_POST
+def whatsapp_webhook(request, token):
+    """Receive 360dialog inbound webhooks (no login, token-guarded)."""
+    expected = getattr(settings, 'D360_WEBHOOK_TOKEN', '') or ''
+    if not expected or not hmac.compare_digest(str(token or ''), str(expected)):
+        return HttpResponse(status=404)
+
+    try:
+        payload = json.loads(request.body.decode('utf-8', errors='replace') or '{}')
+    except ValueError:
+        wa_logger.warning('whatsapp webhook: invalid JSON; ignoring')
+        return HttpResponse(status=200)
+    if not isinstance(payload, dict):
+        return HttpResponse(status=200)
+
+    messages = list(_iter_inbound_wa_messages(payload))
+    if not messages:
+        wa_logger.info('whatsapp webhook: no inbound messages (status update?); ignoring')
+        return HttpResponse(status=200)
+
+    for message in messages:
+        try:
+            _handle_inbound_wa_message(message)
+        except Exception as exc:  # noqa: BLE001 - always keep the hook healthy
+            wa_logger.error('whatsapp webhook: handler error: %s', exc)
+
+    return HttpResponse(status=200)

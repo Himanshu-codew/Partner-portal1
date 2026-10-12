@@ -266,6 +266,12 @@ WHATSAPP_ALLOWED_NUMBERS = [
 # Upper bound on WhatsApp messages sent per day (<= 0 means unlimited).
 NOTIFY_WHATSAPP_DAILY_LIMIT = int(os.environ.get('NOTIFY_WHATSAPP_DAILY_LIMIT', '50'))
 
+# 360dialog WhatsApp provider (Phase 5). WHATSAPP_PROVIDER="360dialog" selects it.
+# The sandbox base URL is used until a production WABA number is provisioned.
+D360_API_KEY = os.environ.get('D360_API_KEY', '').strip()
+D360_BASE_URL = os.environ.get('D360_BASE_URL', 'https://waba-sandbox.360dialog.io').rstrip('/')
+D360_WEBHOOK_TOKEN = os.environ.get('D360_WEBHOOK_TOKEN', '').strip()
+
 
 # ─────────────────────────────────────────────────────────────
 # 9. OCR for KYC documents (Phase 3)

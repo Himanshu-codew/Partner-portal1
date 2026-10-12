@@ -18,7 +18,8 @@ This is a plain-language checklist of decisions/inputs the client must provide. 
 
 - [ ] **Decision:** WhatsApp channel exists but is **disabled by default** (`WHATSAPP_ENABLED=False`). Client must decide to enable only after meeting requirements. **verify**: enable/keep disabled.
 - [ ] **Meta Business Portfolio + WhatsApp number:** Need a dedicated WhatsApp Business number and approved message templates. Free Twilio sandbox only accepts pre-made templates and sandbox numbers. **verify**: number, templates, WABA setup.
-- [ ] **Twilio credentials:** If enabling, provide `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`. Restrict `WHATSAPP_ALLOWED_NUMBERS`. **verify**: allowed recipients.
+- [ ] **Twilio credentials:** If enabling with `WHATSAPP_PROVIDER=twilio`, provide `TWILIO_ACCOUNT_SID`, `TWILIO_AUTH_TOKEN`, `TWILIO_WHATSAPP_FROM`. Restrict `WHATSAPP_ALLOWED_NUMBERS`. **verify**: allowed recipients.
+- [ ] **360dialog credentials (alternative provider):** If enabling with `WHATSAPP_PROVIDER=360dialog`, provide `D360_API_KEY` and set `D360_WEBHOOK_TOKEN`, then register the inbound webhook with `python manage.py d360_set_webhook <https-url>`. **verify**: key, token, webhook registration.
 - [ ] **Consent:** Ensure opt-in/opt-out handled (PartnerProfile has `whatsapp_opt_in` fields) and comply with WhatsApp policies. **verify**: consent policy.
 
 ## OCR and KYC privacy

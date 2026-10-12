@@ -27,8 +27,11 @@ From verified code (`config/settings.py`, `build.sh`):
 | `SITE_URL` | Optional | Absolute base URL without trailing slash for notification emails. If empty and `RENDER_EXTERNAL_HOSTNAME` set, derived as `https://<host>`. |
 | `NOTIFY_EMAIL_DAILY_LIMIT` | Optional | Email daily cap (default 200). |
 | `WHATSAPP_ENABLED` | Optional | "true" enables WhatsApp channel (disabled by default). |
-| `WHATSAPP_PROVIDER` | Optional | Default `twilio`. |
-| `TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN/TWILIO_WHATSAPP_FROM` | Required if WHATSAPP_ENABLED | Twilio WhatsApp credentials/from number. |
+| `WHATSAPP_PROVIDER` | Optional | Default `twilio`; set `360dialog` for the 360dialog provider (Phase 5). |
+| `TWILIO_ACCOUNT_SID/TWILIO_AUTH_TOKEN/TWILIO_WHATSAPP_FROM` | Required if provider=twilio | Twilio WhatsApp credentials/from number. |
+| `D360_API_KEY` | Required if provider=360dialog | 360dialog API key (`D360-API-KEY` header). |
+| `D360_BASE_URL` | Optional | 360dialog base URL (default `https://waba-sandbox.360dialog.io`). |
+| `D360_WEBHOOK_TOKEN` | Required for inbound | Shared secret in the inbound webhook URL path. |
 | `WHATSAPP_ALLOWED_NUMBERS` | Optional | Comma-separated E.164 numbers allowed to receive. |
 | `NOTIFY_WHATSAPP_DAILY_LIMIT` | Optional | WhatsApp daily cap (default 50; <=0 means unlimited in code path — verify). |
 | `OCR_ENABLED` | Optional | "true" enables OCR processing. |
@@ -46,6 +49,7 @@ From verified code (`config/settings.py`, `build.sh`):
 - **Brevo API key**: generate new key in Brevo; update `BREVO_API_KEY`. Test with `python manage.py send_test_email <recipient>`. Revoke old key.
 - **OCR.space API key**: rotate in OCR.space account; update `OCRSPACE_API_KEY`. Test OCR flow on a small document (with OCR_ENABLED true).
 - **Twilio (if enabled)**: rotate Auth Token in Twilio Console; update `TWILIO_AUTH_TOKEN`. Also rotate Account SID only if required; update `TWILIO_ACCOUNT_SID`. Test WhatsApp send via `send_test_whatsapp`.
+- **360dialog (if enabled)**: rotate the key in the 360dialog Hub; update `D360_API_KEY`. Rotate `D360_WEBHOOK_TOKEN` by setting a new value, then re-register the webhook with `python manage.py d360_set_webhook <new-url>`. Test an outbound send via `send_test_whatsapp`.
 
 ## Roll back a bad deploy
 
@@ -61,8 +65,8 @@ From verified code (`config/settings.py`, `build.sh`):
 ## Tests: how to run and duration
 
 - All tests: `python manage.py test` (Django test runner). Suite includes unit/integration and CSS/backup tests added.
-- Specific: `python manage.py test core.tests_backup`, `python manage.py test core.tests_ui_css`, `python manage.py test core.tests_global_search`.
-- Duration (verified in recent runs): full suite ~5s (305 tests) including notifications/ocr tests with mocked network. Duration may vary slightly by environment; mark as "verify" for Render exact timing.
+- Specific: `python manage.py test core.tests_backup`, `python manage.py test core.tests_ui_css`, `python manage.py test core.tests_global_search`, `python manage.py test core.tests_phase5`.
+- Duration (verified in recent runs): full suite ~1s local (336 tests) including notifications/ocr/whatsapp tests with mocked network. Duration may vary by environment; mark as "verify" for Render exact timing.
 
 ## Common errors and causes
 
@@ -74,7 +78,10 @@ From verified code (`config/settings.py`, `build.sh`):
 | File missing after redeploy (uploads) | Files uploaded to disk will be lost on ephemeral filesystem. This app uses `DatabaseFileStorage` (uploads stored in DB) so DB-backed uploads survive redeploys; ensure using DB storage paths (default for partner documents per code). |
 | Brevo API rejected (401/403) | Invalid/rotated `BREVO_API_KEY`. Test with `send_test_email`. |
 | OCR.space errors / quota | `OCR_ENABLED` true but key missing/invalid, or `OCR_DAILY_LIMIT` reached, or file > `OCR_MAX_BYTES`. Check logs and limits. |
-| WhatsApp sandbox restrictions | Free Twilio sandbox only accepts pre-registered templates and numbers in sandbox; production requires approved templates/number. Channel disabled by default. |
+| WhatsApp sandbox restrictions | Twilio sandbox only accepts joined numbers/templates; 360dialog sandbox allows one fixed recipient, few messages and templates only for business-initiated sends. Channel disabled by default. |
+| Inbound webhook 404 | `D360_WEBHOOK_TOKEN` unset or URL token does not match `D360_WEBHOOK_TOKEN`. Set the env var and re-register via `d360_set_webhook`. |
+| Inbound webhook not matching a partner | Sender number not an approved partner's `whatsapp_number` (E.164), or the partner has not opted in. Check the `InboundWhatsAppMessage` row's `status`. |
+| Webhook delivery slow after idle | Free Render instance sleeps; the first delivery after idle can be slow. Provider retries are safe (message ids are de-duplicated). |
 | Approval redirect loops | Unapproved partner accessing allowed paths? Check middleware exempt prefixes; `/search/` not exempt (intentional). Ensure `approval_pending` route accessible. |
 | Static manifest errors in tests/dev | Manifest strictness behavior adjusted in test contexts; in local dev run `collectstatic` after adding assets if using manifest storage. |
 | Notifications not sent but no exception | Wrapped in `transaction.on_commit` and deduped; may be suppressed by dedupe/quota or transaction rolled back. Check `NotificationLog`. |

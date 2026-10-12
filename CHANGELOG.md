@@ -23,8 +23,16 @@ All notable changes to this project are recorded here based on git history.
 ## Fix: select arrow overlapping text
 - Shared CSS fix for `.form-select` (padding-right, truncation, dark-mode arrow). Commit `c1fdce7 fix: select arrow overlapping text`. Added `core.tests_ui_css.py`.
 
-## Handoff documentation and backup command (this change)
-- Added `README.md`, `.env.example`, `docs/RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BACKUP_RESTORE.md`, `docs/CLIENT_HANDOFF.md`, `CHANGELOG.md`.
+## Handoff documentation and backup command
+- Added `README.md`, `.env.example`, `docs/RUNBOOK.md`, `docs/ARCHITECTURE.md`, `docs/BACKUP_RESTORE.md`, `docs/CLIENT_HANDOFF.md`, `CHANGELOG.md`. Commit `0eabc3d docs: handoff documentation and backup command`.
 - Added `core/management/commands/backup_data.py`, tests `core.tests_backup.py`.
 - Updated `.gitignore` to exclude `backups/` and backup JSON patterns.
 - Verified via `python manage.py check` and tests.
+
+## Fix: backup_data without server-side cursors
+- `backup_data` now disables/restores server-side cursors on the `default` connection (Neon/pgbouncer safe), removes partial files on failure, and never prints the DB URL. Added `DB_DISABLE_SERVER_SIDE_CURSORS` setting. Commit `c6a0d15 fix: backup_data without server-side cursors`.
+
+## 5. 360dialog WhatsApp provider and inbound webhook (Phase 5)
+- New `Dialog360WhatsAppProvider` (Cloud API text send via `D360-API-KEY`), selected by `WHATSAPP_PROVIDER=360dialog`; Twilio still supported.
+- Inbound webhook `POST /webhooks/whatsapp/<D360_WEBHOOK_TOKEN>/`: token-guarded, turns WhatsApp texts into `TicketReply(source='whatsapp')` on the partner's open ticket, handles STOP/START opt-out/in, de-duplicates via new `InboundWhatsAppMessage` model (migration `support/0006_inboundwhatsappmessage`).
+- New `send_whatsapp_reply` helper and `d360_set_webhook` command; tests in `core.tests_phase5`. Docs updated (`docs/whatsapp.md`, `RUNBOOK`, `ARCHITECTURE`, `.env.example`).

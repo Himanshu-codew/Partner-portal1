@@ -28,6 +28,9 @@ logger = logging.getLogger('core.whatsapp')
 
 # Twilio Messages REST resource (HTTPS, HTTP Basic auth).
 API_BASE = 'https://api.twilio.com/2010-04-01'
+
+# 360dialog WhatsApp Business API (sandbox by default; override with D360_BASE_URL).
+D360_DEFAULT_BASE_URL = 'https://waba-sandbox.360dialog.io'
 TIMEOUT = 10  # seconds — a hung request must never stall a page render
 
 # Shorten free-form error text before it is recorded anywhere.
@@ -46,11 +49,13 @@ class WhatsAppResult:
 
 
 def redact(text):
-    """Strip Twilio (and email) credentials from a string."""
+    """Strip WhatsApp (and email) credentials from a string."""
     text = str(text)
     for secret in (
         getattr(settings, 'TWILIO_AUTH_TOKEN', ''),
         getattr(settings, 'TWILIO_ACCOUNT_SID', ''),
+        getattr(settings, 'D360_API_KEY', ''),
+        getattr(settings, 'D360_WEBHOOK_TOKEN', ''),
         getattr(settings, 'BREVO_API_KEY', ''),
         getattr(settings, 'EMAIL_HOST_PASSWORD', ''),
     ):
@@ -162,6 +167,108 @@ class TwilioWhatsAppProvider(WhatsAppProvider):
         )
 
 
+class Dialog360WhatsAppProvider(WhatsAppProvider):
+    """360dialog (WhatsApp Business API) sender — outbound text only.
+
+    Uses the 360dialog sandbox endpoint by default
+    (``https://waba-sandbox.360dialog.io``) with the ``D360-API-KEY`` header
+    and the WhatsApp Cloud API message payload. Standard library only.
+    """
+
+    def __init__(self, api_key=None, base_url=None):
+        # None = "read from settings"; an explicit empty string means
+        # "not configured" and must not fall back to settings.
+        self.api_key = (
+            getattr(settings, 'D360_API_KEY', '') if api_key is None else api_key
+        )
+        self.base_url = (
+            getattr(settings, 'D360_BASE_URL', D360_DEFAULT_BASE_URL)
+            if base_url is None else base_url
+        ).rstrip('/')
+
+    @property
+    def configured(self):
+        return bool(self.api_key and self.base_url)
+
+    def send_text(self, to_e164, body):
+        to_e164 = (to_e164 or '').strip()
+        if not to_e164:
+            return WhatsAppResult(error_code='invalid', error_message='missing destination number')
+        if not self.configured:
+            return WhatsAppResult(error_code='not configured', error_message='missing 360dialog settings')
+
+        # Cloud API expects the number as digits only (no leading '+').
+        to_digits = to_e164[1:] if to_e164.startswith('+') else to_e164
+        url = f'{self.base_url}/v1/messages'
+        payload = json.dumps({
+            'messaging_product': 'whatsapp',
+            'to': to_digits,
+            'type': 'text',
+            'text': {'body': str(body or '')},
+        }).encode('utf-8')
+
+        request = urllib.request.Request(url, data=payload)
+        request.add_header('D360-API-KEY', self.api_key)
+        request.add_header('Content-Type', 'application/json')
+
+        try:
+            with urllib.request.urlopen(request, timeout=TIMEOUT) as response:
+                raw = response.read().decode('utf-8', errors='replace')
+            try:
+                data = json.loads(raw)
+            except ValueError:
+                data = {}
+            messages = data.get('messages') or []
+            message_id = ''
+            if messages and isinstance(messages[0], dict):
+                message_id = str(messages[0].get('id', ''))
+            return WhatsAppResult(ok=True, message_id=message_id, status='sent')
+        except urllib.error.HTTPError as exc:
+            return self._from_http_error(exc)
+        except urllib.error.URLError as exc:
+            return WhatsAppResult(
+                error_code='network',
+                error_message=_short(getattr(exc, 'reason', exc)),
+            )
+        except (TimeoutError, OSError) as exc:
+            return WhatsAppResult(error_code='network', error_message=_short(exc))
+        except Exception as exc:  # noqa: BLE001 - send_text must never raise
+            logger.error('360dialog request failed: %s', _short(exc))
+            return WhatsAppResult(error_code='error', error_message=_short(exc))
+
+    @staticmethod
+    def _from_http_error(exc):
+        """Turn a 360dialog 4xx/5xx JSON error body into a result."""
+        raw = b''
+        try:
+            raw = exc.read()
+        except Exception:  # noqa: BLE001 - body may already be consumed
+            pass
+        data = {}
+        if raw:
+            try:
+                data = json.loads(raw.decode('utf-8', errors='replace'))
+            except ValueError:
+                data = {}
+        # 360dialog errors look like {"error": {"message": "...", "code": ...}}
+        error = data.get('error') if isinstance(data, dict) else None
+        if isinstance(error, dict):
+            code = str(error.get('code', '') or error.get('type', ''))
+            message = str(error.get('message', '') or 'request rejected')
+        elif isinstance(error, str):
+            code = ''
+            message = error
+        else:
+            code = str(getattr(exc, 'code', '') or '')
+            message = str(data.get('message', '') if isinstance(data, dict) else '') or 'request rejected'
+        return WhatsAppResult(
+            ok=False,
+            status=str(getattr(exc, 'code', '') or ''),
+            error_code=code,
+            error_message=_short(message),
+        )
+
+
 def get_provider():
     """Return the configured provider, or ``None`` when not set up.
 
@@ -170,6 +277,9 @@ def get_provider():
     """
     try:
         name = (getattr(settings, 'WHATSAPP_PROVIDER', 'twilio') or 'twilio').strip().lower()
+        if name == '360dialog':
+            provider = Dialog360WhatsAppProvider()
+            return provider if provider.configured else None
         if name != 'twilio':
             return None
         provider = TwilioWhatsAppProvider()

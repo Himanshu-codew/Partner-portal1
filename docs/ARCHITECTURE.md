@@ -3,7 +3,7 @@
 ## Apps and responsibilities (verified)
 
 - **accounts**: authentication flows (login/logout, password change/reset), user-facing account views. URLs included from root (`'', include('accounts.urls')`).
-- **core**: shared infrastructure — middleware (`approval`, see below), services (notifications, OCR, email backend, WhatsApp), storage (`DatabaseFileStorage`), models (`StoredFile`, `NotificationLog`, `UserNotificationRead`), management commands (`purge_recycle_bin`, `send_test_email`, `send_test_whatsapp`, `backup_data`), global search views (`search`, `search_suggest`), recycle bin, notifications feed/mark-read, PWA endpoints (`manifest.webmanifest`, `service-worker.js`, `offline/`).
+- **core**: shared infrastructure — middleware (`approval`, see below), services (notifications, OCR, email backend, WhatsApp providers), storage (`DatabaseFileStorage`), models (`StoredFile`, `NotificationLog`, `UserNotificationRead`), management commands (`purge_recycle_bin`, `send_test_email`, `send_test_whatsapp`, `d360_set_webhook`, `backup_data`), global search views (`search`, `search_suggest`), inbound WhatsApp webhook (`whatsapp_webhook`), recycle bin, notifications feed/mark-read, PWA endpoints (`manifest.webmanifest`, `service-worker.js`, `offline/`).
 - **partners**: partner profiles and KYC documents (`PartnerProfile`, `PartnerDocument`), partner list/update, KYC review, upload/download via DB storage. Soft-deleted models in partners include PartnerProfile and PartnerDocument.
 - **leads**: leads CRUD/status, partner-scoped access.
 - **orders**: orders linked to leads/partners, order status, commissions.
@@ -15,7 +15,8 @@
 - `User` (auth) 1:1 with `PartnerProfile` (partners.models). PartnerProfile has `is_approved`, contact prefs, soft-delete.
 - `PartnerDocument` (partners): belongs to `PartnerProfile`, stores `file` path/name via DB storage, `ocr_text`, `extracted_*`, `ocr_status`, `review_status`, `uploaded_at`; soft-deleted.
 - `Lead` (leads), `Order` (orders) linked to partner/profile context; `Order` links to `Lead`.
-- `Ticket` and `TicketReply` (support): partner-scoped tickets, threaded replies.
+- `Ticket` and `TicketReply` (support): partner-scoped tickets, threaded replies (`TicketReply.source` is `portal` or `whatsapp`).
+- `InboundWhatsAppMessage` (support): one row per inbound 360dialog message (`wa_message_id` unique, `from_number`, `body`, optional `matched_ticket`, `status`), used for de-duplication and auditing.
 - `Announcement`, `Document` (portal_content): visibility to partners via M2M where applicable; active flags.
 - `StoredFile` (core): DB-backed binary storage (name, content, content_type, size).
 - `NotificationLog` (core): per-channel delivery attempt (event, channel, status, error redacted, provider_message_id).
@@ -42,7 +43,8 @@ URLs order: core PWA/search/recycle/notifications first, then app includes, then
 - Deduplication window `DEDUPE_TTL=60s` for identical event context per user/channel.
 - Daily caps: `NOTIFY_EMAIL_DAILY_LIMIT` (default 200), `NOTIFY_WHATSAPP_DAILY_LIMIT` (default 50) with `QUOTA_TTL=24h`. Channel failures do not take other channels down.
 - Events: `ticket_reply`, `lead_status_changed`, `order_status_changed`, `commission_paid`, `partner_approval_changed`, `announcement_published`, `kyc_reviewed`.
-- Email via Django email backend; Brevo HTTPS backend used when `BREVO_API_KEY` set. WhatsApp via provider in `core.services.whatsapp`.
+- Email via Django email backend; Brevo HTTPS backend used when `BREVO_API_KEY` set. WhatsApp via a provider in `core.services.whatsapp` (`twilio` or `360dialog`, selected by `WHATSAPP_PROVIDER`).
+- Inbound WhatsApp (360dialog): `POST /webhooks/whatsapp/<token>/` (`core.views.whatsapp_webhook`, `csrf_exempt`) verifies the token with `hmac.compare_digest` (404 on mismatch), ignores status-only payloads, and turns text messages into `TicketReply(source='whatsapp')` on the partner's open ticket. It also handles STOP/START opt-out/in. `send_whatsapp_reply` in the notifications service sends the short system replies under the same limits.
 - Errors redacted (secrets stripped) before logging/storage.
 
 ## OCR pipeline (verified)
