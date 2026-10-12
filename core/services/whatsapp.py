@@ -24,6 +24,8 @@ import urllib.request
 
 from django.conf import settings
 
+from core.utils import normalize_phone
+
 logger = logging.getLogger('core.whatsapp')
 
 # Twilio Messages REST resource (HTTPS, HTTP Basic auth).
@@ -79,6 +81,8 @@ class WhatsAppProvider:
 
 class TwilioWhatsAppProvider(WhatsAppProvider):
     """Twilio WhatsApp sandbox sender (outbound text only)."""
+
+    name = 'twilio'
 
     def __init__(self, account_sid=None, auth_token=None, from_number=None):
         # None = "read from settings"; an explicit empty string means
@@ -174,6 +178,8 @@ class Dialog360WhatsAppProvider(WhatsAppProvider):
     (``https://waba-sandbox.360dialog.io``) with the ``D360-API-KEY`` header
     and the WhatsApp Cloud API message payload. Standard library only.
     """
+
+    name = '360dialog'
 
     def __init__(self, api_key=None, base_url=None):
         # None = "read from settings"; an explicit empty string means
@@ -287,3 +293,63 @@ def get_provider():
     except Exception:  # noqa: BLE001 - configuration must never crash delivery
         logger.exception('whatsapp provider lookup failed: %s', _short('provider error'))
         return None
+
+
+# Required settings per provider, used for clear "what is missing" messages.
+PROVIDER_REQUIRED_SETTINGS = {
+    'twilio': ('TWILIO_ACCOUNT_SID', 'TWILIO_AUTH_TOKEN', 'TWILIO_WHATSAPP_FROM'),
+    '360dialog': ('D360_API_KEY',),
+}
+
+
+def provider_config_problem():
+    """Return a short human reason why WhatsApp cannot send, or ``None``.
+
+    Used by the management commands to explain a Render log entry such as
+    ``skipped: not configured`` without leaking any secret value.
+    """
+    if not getattr(settings, 'WHATSAPP_ENABLED', False):
+        return 'WHATSAPP_ENABLED is not set to True'
+    name = (getattr(settings, 'WHATSAPP_PROVIDER', 'twilio') or 'twilio').strip().lower()
+    if name not in PROVIDER_REQUIRED_SETTINGS:
+        return (
+            "WHATSAPP_PROVIDER must be 'twilio' or '360dialog' "
+            f"(got {name!r})"
+        )
+    missing = [
+        var for var in PROVIDER_REQUIRED_SETTINGS[name]
+        if not str(getattr(settings, var, '') or '').strip()
+    ]
+    if missing:
+        return 'missing required setting(s): ' + ', '.join(missing)
+    return None
+
+
+def is_number_allowed(number, allowed=None):
+    """Whether ``number`` is permitted by the ``WHATSAPP_ALLOWED_NUMBERS`` list.
+
+    An empty/``None`` list means "any number". Both the target and every list
+    entry are normalised to E.164 first, so a value written as ``919876543210``
+    still matches ``+919876543210`` — otherwise a valid recipient would be
+    silently skipped as "number not in allowed list".
+    """
+    if allowed is None:
+        allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
+    if not allowed:
+        return True
+
+    try:
+        target = normalize_phone(number)
+    except Exception:  # noqa: BLE001 - fall back to a literal comparison
+        target = str(number or '').strip()
+
+    for entry in allowed:
+        candidate = str(entry or '').strip()
+        if candidate == target:
+            return True
+        try:
+            if normalize_phone(candidate) == target:
+                return True
+        except Exception:  # noqa: BLE001 - a bad list entry must not break others
+            continue
+    return False

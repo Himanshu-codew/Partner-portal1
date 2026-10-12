@@ -66,6 +66,24 @@ This POSTs `{"url": ...}` to `{D360_BASE_URL}/v1/configs/webhook`. The token
 and API key are never printed. Note: the free Render instance sleeps, so the
 first webhook delivery after idle can be slow.
 
+## Why a message was skipped (debugging)
+
+A `NotificationLog` row of `status=skipped` has an `error` that identifies the
+cause. The common ones:
+
+| Skip reason | Meaning |
+|---|---|
+| `not configured` | `WHATSAPP_ENABLED` is off, or the selected provider's credentials are missing. Run `python manage.py send_test_whatsapp +91...` to get the exact missing variable. |
+| `no whatsapp profile` | Recipient is staff / has no `PartnerProfile`. |
+| `partner not approved` | Profile `is_approved=False`. |
+| `whatsapp notifications disabled` | Partner has `whatsapp_opt_in=False` **or** `notify_whatsapp=False` (consent). |
+| `missing whatsapp number` / `invalid whatsapp number` | No valid E.164 `whatsapp_number` on the profile. |
+| `number not in allowed list` | The number is not in `WHATSAPP_ALLOWED_NUMBERS` (both sides normalised to E.164). |
+| `daily whatsapp limit reached` | `NOTIFY_WHATSAPP_DAILY_LIMIT` hit. |
+
+Note: WhatsApp is **opt-in**. Turning on `WHATSAPP_ENABLED` alone is not enough
+— each partner must opt in (`whatsapp_opt_in` / `notify_whatsapp`).
+
 ## Environment variables (Render)
 
 | Variable | Required | Default | Purpose |

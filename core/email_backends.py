@@ -6,6 +6,10 @@ instead of a mail server.
 
 The API key comes from settings (BREVO_API_KEY, read from the environment).
 It is never logged and is redacted from anything raised or recorded here.
+
+The From address is resolved so Brevo never sees an unverified sender:
+BREVO_SENDER_EMAIL (when set) always wins, otherwise the message From is used
+and finally DEFAULT_FROM_EMAIL is used as a fallback.
 """
 
 import json
@@ -32,13 +36,38 @@ def _redact(text):
     return text
 
 
+def _valid_email(value):
+    """Cheap sanity check: Brevo rejects anything that is not an address."""
+    text = str(value or '').strip()
+    if not text or ' ' in text or '@' not in text:
+        return False
+    local, _, domain = text.partition('@')
+    return bool(local) and '.' in domain and not text.startswith('@')
+
+
 class BrevoAPIEmailBackend(BaseEmailBackend):
     """Sends django.core.mail messages through the Brevo HTTPS API."""
 
     def _sender(self, message):
+        """Resolve the From address, preferring the verified Brevo sender.
+
+        Order of precedence:
+          1. ``BREVO_SENDER_EMAIL`` (a confirmed Brevo sender) — always wins, so
+             transactional mail is never rejected for an unverified From.
+          2. the message's own ``from_email`` (Django defaults this to
+             ``DEFAULT_FROM_EMAIL``), when it looks like a real address.
+          3. ``DEFAULT_FROM_EMAIL``.
+        """
         name, email = parseaddr(message.from_email or '')
-        if not email:
-            name, email = parseaddr(settings.DEFAULT_FROM_EMAIL)
+        if not _valid_email(email):
+            name, email = parseaddr(getattr(settings, 'DEFAULT_FROM_EMAIL', '') or '')
+
+        forced_email = getattr(settings, 'BREVO_SENDER_EMAIL', '') or ''
+        if _valid_email(forced_email):
+            forced_name = getattr(settings, 'BREVO_SENDER_NAME', '') or ''
+            email = forced_email
+            name = forced_name or name or 'Partner Portal'
+
         return {'name': name or 'Partner Portal', 'email': email}
 
     def _html_content(self, message):

@@ -1,8 +1,12 @@
-from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.core.management.base import BaseCommand, CommandError
 
-from core.services.whatsapp import get_provider, redact
+from core.services.whatsapp import (
+    get_provider,
+    is_number_allowed,
+    provider_config_problem,
+    redact,
+)
 from core.utils import normalize_phone
 
 DEFAULT_MESSAGE = (
@@ -28,9 +32,10 @@ class Command(BaseCommand):
         )
 
     def handle(self, *args, **options):
-        if not getattr(settings, 'WHATSAPP_ENABLED', False):
+        problem = provider_config_problem()
+        if problem is not None:
             raise CommandError(
-                'WHATSAPP_ENABLED is off. Set WHATSAPP_ENABLED=True to send WhatsApp messages.'
+                'WhatsApp is not configured: {}. See docs/whatsapp.md.'.format(problem)
             )
 
         provider = get_provider()
@@ -46,8 +51,7 @@ class Command(BaseCommand):
         except ValidationError as exc:
             raise CommandError('Invalid number: {}'.format('; '.join(exc.messages)))
 
-        allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
-        if allowed and number not in allowed:
+        if not is_number_allowed(number):
             raise CommandError(
                 '{} is not in WHATSAPP_ALLOWED_NUMBERS; refusing to send.'.format(number)
             )
@@ -55,7 +59,10 @@ class Command(BaseCommand):
         result = provider.send_text(number, options['message'])
         if result.ok:
             self.stdout.write(self.style.SUCCESS(
-                'Sent to {}: sid={} status={}'.format(number, result.message_id, result.status)
+                'Sent via {} to {}: id={} status={}'.format(
+                    getattr(provider, 'name', 'whatsapp'), number,
+                    result.message_id, result.status,
+                )
             ))
             return
 

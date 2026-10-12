@@ -31,7 +31,7 @@ from django.utils import timezone
 
 from core.models import NotificationLog
 from core.utils import normalize_phone
-from core.services.whatsapp import get_provider
+from core.services.whatsapp import get_provider, is_number_allowed
 from partners.utils import get_partner_profile
 
 logger = logging.getLogger('core.notifications')
@@ -163,7 +163,7 @@ def send_whatsapp_reply(to_e164, body):
         return ChannelResult('skipped', 'not configured')
 
     allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
-    if allowed and to_e164 not in allowed:
+    if not is_number_allowed(to_e164, allowed):
         return ChannelResult('skipped', 'number not in allowed list')
     if not _whatsapp_quota_available():
         return ChannelResult('skipped', 'daily whatsapp limit reached')
@@ -202,6 +202,10 @@ class EmailChannel:
         email = (getattr(user, 'email', '') or '').strip()
         if not email:
             return ChannelResult('skipped', 'no email address')
+        # Guard against a malformed address reaching the provider, which would
+        # be rejected by Brevo (and logged as a hard failure) otherwise.
+        if '@' not in email or ' ' in email:
+            return ChannelResult('skipped', 'invalid email address')
         profile = get_partner_profile(user)
         # Staff (and other users without a profile) may always be emailed.
         if profile is not None and not profile.notify_email:
@@ -260,7 +264,7 @@ class WhatsAppChannel:
             return ChannelResult('skipped', 'not configured')
 
         allowed = getattr(settings, 'WHATSAPP_ALLOWED_NUMBERS', None) or []
-        if allowed and number not in allowed:
+        if not is_number_allowed(number, allowed):
             return ChannelResult('skipped', 'number not in allowed list')
         if not _whatsapp_quota_available():
             return ChannelResult('skipped', 'daily whatsapp limit reached')
@@ -271,8 +275,9 @@ class WhatsAppChannel:
 
         result = provider.send_text(number, body)
         if not result.ok:
+            provider_name = getattr(provider, 'name', '') or 'whatsapp'
             error = (
-                f'twilio {result.error_code}: {result.error_message}'
+                f'{provider_name} {result.error_code}: {result.error_message}'
                 if result.error_code else result.error_message
             )
             return ChannelResult('failed', error or 'send failed')

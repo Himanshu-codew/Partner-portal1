@@ -21,7 +21,9 @@ From verified code (`config/settings.py`, `build.sh`):
 | `CSRF_TRUSTED_ORIGINS` | Optional | Comma-separated origins (https://...). Render hostname origin added. |
 | `DATABASE_URL` | Yes (prod) | Postgres URL (psycopg2-binary). If absent, uses SQLite locally. |
 | `DB_DISABLE_SERVER_SIDE_CURSORS` | Optional | Set `True` to force client-side cursors globally. Recommended on Neon (especially behind a pooler) to avoid dropped named cursors during `dumpdata` / `queryset.iterator()`. Default `False`. |
-| `DEFAULT_FROM_EMAIL` | Optional | Sender for notifications/password reset emails. |
+| `DEFAULT_FROM_EMAIL` | Optional | Fallback sender for notifications/password reset emails. |
+| `BREVO_SENDER_EMAIL` | Recommended with Brevo | Verified Brevo sender. When set it overrides every per-message From, preventing `400 sender not valid`. |
+| `BREVO_SENDER_NAME` | Optional | Display name for `BREVO_SENDER_EMAIL`. |
 | `BREVO_API_KEY` | Yes if using Brevo email | Enables Brevo HTTPS API backend (`core.email_backends.BrevoAPIEmailBackend`). If unset in non-DEBUG, SMTP backend selected by logic. |
 | `EMAIL_HOST/PORT/USE_TLS/USE_SSL/USER/PASS` | Optional | SMTP config when not using Brevo. |
 | `SITE_URL` | Optional | Absolute base URL without trailing slash for notification emails. If empty and `RENDER_EXTERNAL_HOSTNAME` set, derived as `https://<host>`. |
@@ -65,8 +67,8 @@ From verified code (`config/settings.py`, `build.sh`):
 ## Tests: how to run and duration
 
 - All tests: `python manage.py test` (Django test runner). Suite includes unit/integration and CSS/backup tests added.
-- Specific: `python manage.py test core.tests_backup`, `python manage.py test core.tests_ui_css`, `python manage.py test core.tests_global_search`, `python manage.py test core.tests_phase5`.
-- Duration (verified in recent runs): full suite ~1s local (336 tests) including notifications/ocr/whatsapp tests with mocked network. Duration may vary by environment; mark as "verify" for Render exact timing.
+- Specific: `python manage.py test core.tests_backup`, `python manage.py test core.tests_ui_css`, `python manage.py test core.tests_global_search`, `python manage.py test core.tests_phase5`, `python manage.py test core.tests_email_whatsapp_fixes`.
+- Duration (verified in recent runs): full suite ~20s local (358 tests) including notifications/ocr/whatsapp tests with mocked network. Duration may vary by environment; mark as "verify" for Render exact timing.
 
 ## Common errors and causes
 
@@ -77,6 +79,9 @@ From verified code (`config/settings.py`, `build.sh`):
 | `'no such table'` after pulling new migrations locally | Run `python manage.py migrate`. If DB out of sync, consider recreating local DB or migrating. |
 | File missing after redeploy (uploads) | Files uploaded to disk will be lost on ephemeral filesystem. This app uses `DatabaseFileStorage` (uploads stored in DB) so DB-backed uploads survive redeploys; ensure using DB storage paths (default for partner documents per code). |
 | Brevo API rejected (401/403) | Invalid/rotated `BREVO_API_KEY`. Test with `send_test_email`. |
+| Brevo rejected `400 sender not valid / not authorized` | `DEFAULT_FROM_EMAIL` (or a per-message From) is not a verified sender/domain in Brevo. Set `BREVO_SENDER_EMAIL` to a verified sender and redeploy. `send_test_email` prints the effective From. |
+| Notifications skipped `not configured` / `whatsapp notifications disabled` | WhatsApp needs `WHATSAPP_ENABLED=True` **and** configured provider credentials **and** per-partner opt-in. Run `python manage.py send_test_whatsapp +91...` to see the exact missing variable. |
+| WhatsApp `number not in allowed list` for a valid number | Format difference in `WHATSAPP_ALLOWED_NUMBERS`. Entries are normalised now, but keep them E.164 (`+91...`) to be safe. |
 | OCR.space errors / quota | `OCR_ENABLED` true but key missing/invalid, or `OCR_DAILY_LIMIT` reached, or file > `OCR_MAX_BYTES`. Check logs and limits. |
 | WhatsApp sandbox restrictions | Twilio sandbox only accepts joined numbers/templates; 360dialog sandbox allows one fixed recipient, few messages and templates only for business-initiated sends. Channel disabled by default. |
 | Inbound webhook 404 | `D360_WEBHOOK_TOKEN` unset or URL token does not match `D360_WEBHOOK_TOKEN`. Set the env var and re-register via `d360_set_webhook`. |

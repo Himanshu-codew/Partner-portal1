@@ -209,12 +209,23 @@ if DEBUG:
 # ─────────────────────────────────────────────────────────────
 # 6. Email Configuration (Brevo HTTPS API — SMTP is blocked on Render free tier)
 # ─────────────────────────────────────────────────────────────
-DEFAULT_FROM_EMAIL = os.environ.get('DEFAULT_FROM_EMAIL', 'Partner Portal <no-reply@example.com>')
+DEFAULT_FROM_EMAIL = os.environ.get(
+    'DEFAULT_FROM_EMAIL', 'Partner Portal <no-reply@example.com>'
+).strip()
 SERVER_EMAIL = DEFAULT_FROM_EMAIL
+
+# Verified Brevo sender. When set, BrevoAPIEmailBackend ALWAYS uses this as the
+# From address (name from BREVO_SENDER_NAME), regardless of any per-message
+# from_email. This is what prevents Brevo rejecting transactional mail with
+# "sender not valid / not authorized" when DEFAULT_FROM_EMAIL points at an
+# unverified mailbox (e.g. a personal Gmail). Leave empty to fall back to
+# DEFAULT_FROM_EMAIL.
+BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
+BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', '').strip()
 
 # With BREVO_API_KEY set, all mail goes through Brevo's HTTPS API via
 # core.email_backends.BrevoAPIEmailBackend instead of SMTP.
-BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '')
+BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
 if BREVO_API_KEY:
     EMAIL_BACKEND = 'core.email_backends.BrevoAPIEmailBackend'
 else:
@@ -250,7 +261,8 @@ NOTIFY_EMAIL_DAILY_LIMIT = int(os.environ.get('NOTIFY_EMAIL_DAILY_LIMIT', '200')
 # WhatsApp sandbox. The channel stays disabled until WHATSAPP_ENABLED is
 # turned on and the Twilio settings below are provided.
 WHATSAPP_ENABLED = os.environ.get('WHATSAPP_ENABLED', 'False').lower() in ('true', '1', 't', 'yes')
-WHATSAPP_PROVIDER = os.environ.get('WHATSAPP_PROVIDER', 'twilio').strip() or 'twilio'
+# Normalised to lower case so "360Dialog" / "Twilio " work as expected.
+WHATSAPP_PROVIDER = os.environ.get('WHATSAPP_PROVIDER', 'twilio').strip().lower() or 'twilio'
 TWILIO_ACCOUNT_SID = os.environ.get('TWILIO_ACCOUNT_SID', '').strip()
 TWILIO_AUTH_TOKEN = os.environ.get('TWILIO_AUTH_TOKEN', '')
 TWILIO_WHATSAPP_FROM = os.environ.get('TWILIO_WHATSAPP_FROM', '').strip()

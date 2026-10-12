@@ -36,3 +36,8 @@ All notable changes to this project are recorded here based on git history.
 - New `Dialog360WhatsAppProvider` (Cloud API text send via `D360-API-KEY`), selected by `WHATSAPP_PROVIDER=360dialog`; Twilio still supported.
 - Inbound webhook `POST /webhooks/whatsapp/<D360_WEBHOOK_TOKEN>/`: token-guarded, turns WhatsApp texts into `TicketReply(source='whatsapp')` on the partner's open ticket, handles STOP/START opt-out/in, de-duplicates via new `InboundWhatsAppMessage` model (migration `support/0006_inboundwhatsappmessage`).
 - New `send_whatsapp_reply` helper and `d360_set_webhook` command; tests in `core.tests_phase5`. Docs updated (`docs/whatsapp.md`, `RUNBOOK`, `ARCHITECTURE`, `.env.example`).
+
+## Fix: notification email sender and WhatsApp diagnostics
+- Email: `BrevoAPIEmailBackend` now resolves the From address — `BREVO_SENDER_EMAIL` (verified sender) overrides, otherwise the message From, otherwise `DEFAULT_FROM_EMAIL` — so Brevo no longer rejects transactional mail with "sender not valid". Added `BREVO_SENDER_EMAIL`/`BREVO_SENDER_NAME` settings.
+- `EmailChannel` skips malformed recipient addresses (`invalid email address`) instead of letting Brevo hard-fail.
+- WhatsApp: `WHATSAPP_ALLOWED_NUMBERS` entries are normalised to E.164 before matching (`9198502965232` == `+9198502965232`); provider errors now carry the provider name (`360dialog ...`, not a hard-coded `twilio`); added `provider_config_problem()` / `is_number_allowed()` and clearer `send_test_email` / `send_test_whatsapp` output. Tests in `core.tests_email_whatsapp_fixes`.
