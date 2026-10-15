@@ -22,6 +22,10 @@ Providers (``OCR_PROVIDER``):
     server. PDFs are rendered to images with poppler's ``pdftoppm``.
   * ``hybrid`` — Tesseract first; OCR.space only when Tesseract finds little
     or no text and the daily quota still has room.
+  * ``remote`` — Tesseract on a separate OCR helper service (the Docker
+    image with ``OCR_WORKER_ONLY``), reached over HTTPS at ``OCR_REMOTE_URL``
+    with the shared ``OCR_WORKER_TOKEN``. Lets the main portal stay on the
+    native Python runtime. ``remote_hybrid`` adds the OCR.space fallback.
 """
 
 import glob
@@ -34,11 +38,13 @@ import shutil
 import subprocess
 import tempfile
 import threading
+import time
 import uuid
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connections
@@ -74,11 +80,14 @@ class OCRResult:
 
 
 def _redact(text):
-    """Strip the configured API key from a string before it is stored/logged."""
+    """Strip the API key and helper token from a string before it is stored/logged."""
     text = str(text)
-    key = getattr(settings, 'OCRSPACE_API_KEY', '')
-    if key and key in text:
-        text = text.replace(key, '[redacted]')
+    for secret in (
+        getattr(settings, 'OCRSPACE_API_KEY', ''),
+        getattr(settings, 'OCR_WORKER_TOKEN', ''),
+    ):
+        if secret and secret in text:
+            text = text.replace(secret, '[redacted]')
     return text
 
 
@@ -338,22 +347,102 @@ class HybridProvider(OCRProvider):
         return OCRResult(False, '', f'{result.error}; fallback: {fallback.error}', self.name)
 
 
+class RemoteOCRProvider(OCRProvider):
+    """Tesseract on the separate OCR helper service, over HTTPS.
+
+    POSTs the file to ``<OCR_REMOTE_URL>/internal/ocr/`` with the shared
+    ``OCR_WORKER_TOKEN`` as a Bearer token. A free Render helper sleeps when
+    idle and can answer 502/503 or drop the connection while it wakes up, so
+    one retry follows a short pause. Never raises; the token is never logged.
+    """
+
+    name = 'remote'
+    RETRY_DELAY = 10  # seconds between the two attempts
+
+    def __init__(self, url='', token='', timeout=300):
+        self.url = (url or '').strip().rstrip('/')
+        self.token = (token or '').strip()
+        self.timeout = timeout
+
+    def extract_text(self, file_bytes, filename, content_type=''):
+        if not self.url or not self.token:
+            return OCRResult(
+                False, '', 'OCR helper is not configured (OCR_REMOTE_URL / OCR_WORKER_TOKEN)', self.name
+            )
+        try:
+            response = self._post(file_bytes, filename, content_type)
+            if isinstance(response, OCRResult):
+                return response
+            if response.status_code != 200:
+                return OCRResult(
+                    False, '', _short(f'OCR helper HTTP {response.status_code}: {response.text[:200]}'), self.name
+                )
+            try:
+                payload = response.json()
+            except ValueError:
+                return OCRResult(False, '', 'OCR helper returned a non-JSON response', self.name)
+            if not isinstance(payload, dict):
+                return OCRResult(False, '', 'OCR helper returned an unexpected response', self.name)
+            text = str(payload.get('text') or '')
+            return OCRResult(bool(payload.get('ok')), text[:MAX_TEXT], _short(payload.get('error') or ''), self.name)
+        except Exception as exc:  # noqa: BLE001 - a provider must never raise
+            return OCRResult(False, '', _short(f'OCR helper request failed: {exc}'), self.name)
+
+    def _post(self, file_bytes, filename, content_type):
+        """POST with one retry while the helper wakes up; a response or a failed OCRResult."""
+        endpoint = f'{self.url}/internal/ocr/'
+        for attempt in (1, 2):
+            try:
+                response = requests.post(
+                    endpoint,
+                    files={'file': (filename or 'upload', file_bytes, content_type or 'application/octet-stream')},
+                    headers={'Authorization': f'Bearer {self.token}'},
+                    timeout=(15, self.timeout),
+                )
+            except requests.RequestException as exc:
+                if attempt == 1:
+                    time.sleep(self.RETRY_DELAY)
+                    continue
+                return OCRResult(False, '', _short(f'OCR helper request failed: {type(exc).__name__}'), self.name)
+            if response.status_code in (502, 503, 504) and attempt == 1:
+                time.sleep(self.RETRY_DELAY)
+                continue
+            return response
+
+
+def local_provider():
+    """The Tesseract provider built from settings (also used by the helper endpoint)."""
+    return TesseractProvider(
+        lang=getattr(settings, 'OCR_TESSERACT_LANG', 'eng+hin'),
+        timeout=getattr(settings, 'OCR_TESSERACT_TIMEOUT', 120),
+        max_pages=getattr(settings, 'OCR_PDF_MAX_PAGES', 5),
+    )
+
+
+def remote_provider():
+    return RemoteOCRProvider(
+        url=getattr(settings, 'OCR_REMOTE_URL', ''),
+        token=getattr(settings, 'OCR_WORKER_TOKEN', ''),
+        timeout=getattr(settings, 'OCR_REMOTE_TIMEOUT', 300),
+    )
+
+
 def get_provider():
     """Return the configured provider, or ``None`` when OCR is off."""
     if not getattr(settings, 'OCR_ENABLED', False):
         return None
     name = (getattr(settings, 'OCR_PROVIDER', 'ocrspace') or 'ocrspace').strip().lower()
+    ocrspace = OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', ''))
     if name == 'ocrspace':
-        return OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', ''))
-    if name in ('tesseract', 'hybrid'):
-        local = TesseractProvider(
-            lang=getattr(settings, 'OCR_TESSERACT_LANG', 'eng+hin'),
-            timeout=getattr(settings, 'OCR_TESSERACT_TIMEOUT', 120),
-            max_pages=getattr(settings, 'OCR_PDF_MAX_PAGES', 5),
-        )
-        if name == 'tesseract':
-            return local
-        return HybridProvider(local, OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', '')))
+        return ocrspace
+    if name == 'tesseract':
+        return local_provider()
+    if name == 'hybrid':
+        return HybridProvider(local_provider(), ocrspace)
+    if name == 'remote':
+        return remote_provider()
+    if name == 'remote_hybrid':
+        return HybridProvider(remote_provider(), ocrspace)
     logger.warning('unsupported OCR provider requested: %s', _redact(name))
     return None
 

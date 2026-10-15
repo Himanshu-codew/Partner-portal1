@@ -45,7 +45,7 @@ skipped`. **Retry OCR** (POST) re-runs any non-processing document.
 | Variable | Required | Default | Purpose |
 |---|---|---|---|
 | `OCR_ENABLED` | yes (to run) | `False` | Master switch. Off = uploads are marked `skipped` ("OCR is not enabled") and no HTTP call is made. |
-| `OCR_PROVIDER` | no | `ocrspace` | `ocrspace`, `tesseract` or `hybrid` (see below). |
+| `OCR_PROVIDER` | no | `ocrspace` | `ocrspace`, `tesseract`, `hybrid`, `remote` or `remote_hybrid` (see below). |
 | `OCRSPACE_API_KEY` | for `ocrspace` | – | OCR.space API key (header only, redacted everywhere). Optional with `hybrid` (no key = no fallback). |
 | `OCR_DAILY_LIMIT` | no | `100` | Max **OCR.space** calls per day (`<= 0` = unlimited). Over the limit = `skipped` (`ocrspace`) or no fallback (`hybrid`). Tesseract runs are never counted. |
 | `OCR_MAX_BYTES` | no | `1048576` | Applies to OCR.space only. Larger *images* are downscaled to ≤1600 px / JPEG 80 (Pillow) when available; otherwise they are `skipped` with "file larger than 1 MB, enter details manually". Tesseract reads the whole upload (max 5 MB). |
@@ -95,14 +95,53 @@ Leave the live service untouched until the Docker service is verified.
 5. Upload test PAN / Aadhaar / PDF documents and check the OCR text and
    suggestions on the KYC review page.
 
-### Switch the live service
+### Use it from the live service (OCR helper, recommended)
 
-When the test service works: live service → **Settings** → change the
-runtime to **Docker** (if Render does not allow changing it, create the
-Docker service as the new live service and move the custom domain), clear
-the build/start commands, set `OCR_PROVIDER=tesseract` (or `hybrid`) and
-deploy. To roll back OCR without redeploying code, set
-`OCR_PROVIDER=ocrspace`.
+Render cannot switch an existing native Python service to Docker, and a new
+service gets a new `onrender.com` URL. To keep the live URL, the live portal
+stays on Python and sends documents to the Docker service, which runs as an
+**OCR helper**:
+
+```
+partner upload → live portal (Python, OCR_PROVIDER=remote)
+               → POST https://<helper>/internal/ocr/  (Bearer OCR_WORKER_TOKEN)
+               → helper runs Tesseract → JSON text → live portal masks + suggests
+```
+
+1. Generate a shared secret (24+ characters), for example
+   `python -c "import secrets; print(secrets.token_urlsafe(32))"`.
+2. **Helper** (the Docker service) → Environment: **remove `DATABASE_URL`**
+   (the helper needs no data; it uses a throwaway SQLite file) and set:
+   `OCR_WORKER_TOKEN=<secret>`, `OCR_WORKER_ONLY=True`,
+   `GUNICORN_TIMEOUT=600`. Keep `DJANGO_SECRET_KEY` and `RENDER=true`.
+   With `OCR_WORKER_ONLY` every page except `/internal/ocr/` answers 404.
+   Opening `https://<helper>/internal/ocr/` in a browser shows
+   `{"status": "ready", "tesseract": true}`.
+3. **Live service** → Environment: `OCR_ENABLED=True`,
+   `OCR_PROVIDER=remote` (or `remote_hybrid` to fall back to OCR.space
+   while its quota lasts), `OCR_REMOTE_URL=https://<helper>.onrender.com`,
+   `OCR_WORKER_TOKEN=<same secret>`.
+4. Upload a test document on the live portal; its OCR status becomes
+   `done` within a minute or two (longer if the helper was asleep).
+
+A sleeping free helper takes up to a minute to wake; the request waits
+(`OCR_REMOTE_TIMEOUT`, default 300 s) and is retried once on 502/503 or a
+dropped connection. If the helper is down, documents are marked `failed`
+and staff can use **Retry OCR** later. Roll back any time with
+`OCR_PROVIDER=ocrspace`. Free instance hours (750/month) are shared by all
+services in the workspace; the helper only uses hours while awake.
+
+| Variable | Where | Default | Purpose |
+|---|---|---|---|
+| `OCR_WORKER_TOKEN` | both | – | Shared secret (24+ chars). Enables the helper endpoint; authenticates the live portal. |
+| `OCR_WORKER_ONLY` | helper | `False` | Hide every page except `/internal/ocr/`. |
+| `OCR_WORKER_MAX_BYTES` | helper | `10485760` | Largest file the helper accepts. |
+| `GUNICORN_TIMEOUT` | helper | `120` | Seconds per request; set 600 so multi-page PDFs finish. |
+| `OCR_REMOTE_URL` | live | – | Helper base URL, e.g. `https://partner-portal-ocr-test.onrender.com`. |
+| `OCR_REMOTE_TIMEOUT` | live | `300` | Seconds to wait for the helper (wake-up + OCR). |
+
+Alternatively, run the whole portal from the Docker image with
+`OCR_PROVIDER=tesseract` (no helper), accepting the new service URL.
 
 ## OCR.space free limits (`ocrspace` / `hybrid` fallback)
 

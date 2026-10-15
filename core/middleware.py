@@ -1,6 +1,7 @@
+from django.conf import settings
 from django.shortcuts import redirect
 from django.urls import reverse, NoReverseMatch
-from django.http import JsonResponse
+from django.http import HttpResponseNotFound, JsonResponse
 from partners.utils import get_partner_profile
 
 class PartnerApprovalMiddleware:
@@ -66,4 +67,23 @@ class PartnerApprovalMiddleware:
                 except NoReverseMatch:
                     pass
 
+        return self.get_response(request)
+
+
+class OCRWorkerOnlyMiddleware:
+    """On the OCR helper service (OCR_WORKER_ONLY=True) expose only /internal/ocr/.
+
+    The helper runs the same Docker image as the portal but has no database
+    of its own, so every other page (login, admin, signup...) answers 404.
+    A no-op on the main portal, where the setting is off.
+    """
+
+    ALLOWED_PATH = '/internal/ocr/'
+
+    def __init__(self, get_response):
+        self.get_response = get_response
+
+    def __call__(self, request):
+        if getattr(settings, 'OCR_WORKER_ONLY', False) and request.path != self.ALLOWED_PATH:
+            return HttpResponseNotFound()
         return self.get_response(request)

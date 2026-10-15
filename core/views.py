@@ -2,6 +2,7 @@ import json
 import hmac
 import logging
 import re
+import shutil
 
 from django.shortcuts import render, redirect, get_object_or_404
 from django.contrib.auth.decorators import login_required
@@ -19,6 +20,7 @@ from django.utils import timezone
 from django.utils.http import urlencode
 from django.core.cache import cache
 from django.views.decorators.csrf import csrf_exempt
+from core.services.ocr import local_provider
 from partners.utils import get_partner_profile
 
 
@@ -910,3 +912,53 @@ def whatsapp_webhook(request, token):
             wa_logger.error('whatsapp webhook: handler error: %s', exc)
 
     return HttpResponse(status=200)
+
+
+# =================================================================
+# OCR helper endpoint (Phase 7)
+# =================================================================
+
+ocr_logger = logging.getLogger('core.ocr')
+OCR_WORKER_MIN_TOKEN_LENGTH = 24
+
+
+def _ocr_worker_token():
+    """The shared helper token, or '' when the endpoint is disabled."""
+    token = (getattr(settings, 'OCR_WORKER_TOKEN', '') or '').strip()
+    if token and len(token) < OCR_WORKER_MIN_TOKEN_LENGTH:
+        ocr_logger.warning('OCR_WORKER_TOKEN is too short; the OCR helper endpoint is disabled')
+        return ''
+    return token
+
+
+@csrf_exempt
+def ocr_worker(request):
+    """Run Tesseract for the main portal (RemoteOCRProvider) and return JSON.
+
+    GET reports readiness (no secrets). POST needs ``Authorization: Bearer
+    <OCR_WORKER_TOKEN>`` and a multipart ``file``. The endpoint does not exist
+    (404) unless OCR_WORKER_TOKEN is set. Extracted text is never logged.
+    """
+    token = _ocr_worker_token()
+    if not token:
+        return HttpResponse(status=404)
+
+    if request.method == 'GET':
+        return JsonResponse({'status': 'ready', 'tesseract': bool(shutil.which('tesseract'))})
+    if request.method != 'POST':
+        return HttpResponse(status=405)
+
+    supplied = request.headers.get('Authorization', '').encode('utf-8', 'replace')
+    if not hmac.compare_digest(supplied, f'Bearer {token}'.encode('utf-8')):
+        return JsonResponse({'ok': False, 'error': 'unauthorized'}, status=401)
+
+    upload = request.FILES.get('file')
+    if upload is None:
+        return JsonResponse({'ok': False, 'error': 'no file'}, status=400)
+    max_bytes = getattr(settings, 'OCR_WORKER_MAX_BYTES', 10 * 1024 * 1024)
+    if upload.size > max_bytes:
+        return JsonResponse({'ok': False, 'error': 'file too large'}, status=413)
+
+    result = local_provider().extract_text(upload.read(), upload.name, upload.content_type or '')
+    ocr_logger.info('OCR helper: %s bytes -> ok=%s, %s chars', upload.size, result.ok, len(result.text))
+    return JsonResponse({'ok': result.ok, 'text': result.text, 'error': result.error})

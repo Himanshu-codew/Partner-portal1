@@ -79,6 +79,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'core.middleware.OCRWorkerOnlyMiddleware',
     'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
@@ -333,6 +334,17 @@ OCR_MAX_BYTES = int(os.environ.get('OCR_MAX_BYTES', str(1024 * 1024)))
 OCR_TESSERACT_LANG = os.environ.get('OCR_TESSERACT_LANG', 'eng+hin').strip() or 'eng+hin'
 OCR_TESSERACT_TIMEOUT = int(os.environ.get('OCR_TESSERACT_TIMEOUT', '120'))
 OCR_PDF_MAX_PAGES = int(os.environ.get('OCR_PDF_MAX_PAGES', '5'))
+
+# OCR helper service. On the helper (Docker image): OCR_WORKER_TOKEN enables
+# POST /internal/ocr/ and OCR_WORKER_ONLY=True hides every other page. On the
+# main portal (OCR_PROVIDER=remote / remote_hybrid): OCR_REMOTE_URL is the
+# helper's base URL and OCR_WORKER_TOKEN the same shared secret (24+ chars).
+OCR_WORKER_TOKEN = os.environ.get('OCR_WORKER_TOKEN', '').strip()
+OCR_WORKER_ONLY = os.environ.get('OCR_WORKER_ONLY', 'False').lower() in ('true', '1', 't', 'yes')
+OCR_WORKER_MAX_BYTES = int(os.environ.get('OCR_WORKER_MAX_BYTES', str(10 * 1024 * 1024)))
+OCR_REMOTE_URL = os.environ.get('OCR_REMOTE_URL', '').strip()
+# Seconds to wait for the helper; covers a free instance waking up plus OCR.
+OCR_REMOTE_TIMEOUT = int(os.environ.get('OCR_REMOTE_TIMEOUT', '300'))
 
 
 # ─────────────────────────────────────────────────────────────

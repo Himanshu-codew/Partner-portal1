@@ -49,6 +49,10 @@ From verified code (`config/settings.py`, `build.sh`):
 | `OCR_TESSERACT_LANG` | Optional | Tesseract languages (default `eng+hin`). |
 | `OCR_TESSERACT_TIMEOUT` | Optional | Seconds per Tesseract/pdftoppm step (default 120). |
 | `OCR_PDF_MAX_PAGES` | Optional | PDF pages read by Tesseract (default 5). |
+| `OCR_WORKER_TOKEN` | Required for the OCR helper | Shared secret (24+ chars) on the helper and the live portal. See `docs/ocr.md`. |
+| `OCR_WORKER_ONLY` | Helper only | `True` hides every page except `/internal/ocr/`. |
+| `OCR_REMOTE_URL` / `OCR_REMOTE_TIMEOUT` | Live portal with `OCR_PROVIDER=remote` | Helper base URL; seconds to wait (default 300). |
+| `GUNICORN_TIMEOUT` | Optional (Docker) | Request timeout for the Docker start script (default 120; 600 on the helper). |
 | `SECURE_HSTS_SECONDS` | Optional | HSTS max-age in non-DEBUG (default 3600). |
 | `DJANGO_SUPERUSER_USERNAME/PASSWORD/EMAIL` | Optional | Used by `build.sh` to create superuser on build (createsuperuser --noinput). |
 
@@ -159,6 +163,7 @@ To switch back to Brevo, set `EMAIL_PROVIDER=brevo` (or clear it) and make sure 
 | WhatsApp `number not in allowed list` for a valid number | Format difference in `WHATSAPP_ALLOWED_NUMBERS`. Entries are normalised now, but keep them E.164 (`+91...`) to be safe. |
 | OCR.space errors / quota | `OCR_ENABLED` true but key missing/invalid, or `OCR_DAILY_LIMIT` reached, or file > `OCR_MAX_BYTES`. Check logs and limits. |
 | OCR failed `Tesseract is not installed on this server` | `OCR_PROVIDER=tesseract` on the native Python deploy. Tesseract exists only in the Docker image; deploy with the `Dockerfile` (see `docs/ocr.md`) or set `OCR_PROVIDER=ocrspace`/`hybrid`. |
+| OCR failed `OCR helper request failed` / `OCR helper HTTP 401` / `HTTP 404` | Helper asleep and not waking, wrong `OCR_REMOTE_URL`, or `OCR_WORKER_TOKEN` differs between the two services (401) or is missing/shorter than 24 chars on the helper (404). Open `https://<helper>/internal/ocr/` to check it says `ready`, then **Retry OCR**. |
 | OCR failed `tesseract timed out after 120s` | Slow free-tier CPU or a very large/multi-page file. Raise `OCR_TESSERACT_TIMEOUT` or lower `OCR_PDF_MAX_PAGES`, then **Retry OCR**. |
 | WhatsApp sandbox restrictions | Twilio sandbox only accepts joined numbers/templates; 360dialog sandbox allows one fixed recipient, few messages and templates only for business-initiated sends. Channel disabled by default. |
 | Inbound webhook 404 | `D360_WEBHOOK_TOKEN` unset or URL token does not match `D360_WEBHOOK_TOKEN`. Set the env var and re-register via `d360_set_webhook`. |

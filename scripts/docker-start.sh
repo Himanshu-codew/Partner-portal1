@@ -11,7 +11,9 @@ if [ -n "${DJANGO_SUPERUSER_USERNAME}" ] && [ -n "${DJANGO_SUPERUSER_PASSWORD}" 
 fi
 
 # One worker by default (512 MB on the free plan); WEB_CONCURRENCY overrides.
+# GUNICORN_TIMEOUT: raise it on the OCR helper, where one request runs OCR
+# on a whole multi-page PDF.
 exec gunicorn config.wsgi:application \
   --bind "0.0.0.0:${PORT:-10000}" \
   --workers "${WEB_CONCURRENCY:-1}" \
-  --timeout 120
+  --timeout "${GUNICORN_TIMEOUT:-120}"
