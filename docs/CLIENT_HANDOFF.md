@@ -8,11 +8,25 @@ This is a plain-language checklist of decisions/inputs the client must provide. 
 - [ ] **Postgres:** Project uses Neon Postgres in production via `DATABASE_URL` (per README). If moving, update `DATABASE_URL`. **verify**: which Neon branch/region.
 - [ ] **Custom domain:** If using custom domain, configure DNS (CNAME/ALIAS) and add to `ALLOWED_HOSTS` and `CSRF_TRUSTED_ORIGINS`. Render HTTPS handled if configured. **verify**: domain name.
 
-## Email (Brevo) and deliverability
+## Email (Brevo or Gmail API) and deliverability
 
 - [ ] **Brevo account/domain auth:** Using Brevo API (`BREVO_API_KEY`). Set up Brevo domain authentication (SPF/DKIM/DMARC) for the sender domain so emails don't land in spam. **verify**: sender domain, Brevo sender identity.
 - [ ] **From address:** Set `DEFAULT_FROM_EMAIL` to an address on the authenticated domain. **verify**: chosen address.
 - [ ] **Rate limits:** Default `NOTIFY_EMAIL_DAILY_LIMIT=200`. Adjust if expected volume differs. **verify**: expected email volume.
+
+### Interim option: Gmail API (`EMAIL_PROVIDER=gmail_api`)
+
+The portal can send through the Gmail API over HTTPS (it works on Render's free tier, where SMTP is blocked). This is useful while Brevo is unavailable. The full step-by-step guide is in `docs/RUNBOOK.md` → *Email through the Gmail API*. In short:
+
+1. **Google Cloud project:** sign in with the sending Gmail account at <https://console.cloud.google.com/>, create a project and enable the **Gmail API** (APIs & Services → Library).
+2. **OAuth consent screen:** User type **External**, app name "Partner Portal", the support and developer emails, scope `https://www.googleapis.com/auth/gmail.send`.
+3. **Publish the app (In production):** ⚠️ while the consent screen is in **Testing** status, the refresh token **expires after 7 days** and email stops working. Click **Publish app** so the status is **In production**. The "Google hasn't verified this app" warning during consent is acceptable for personal use.
+4. **Desktop OAuth client:** Credentials → Create credentials → OAuth client ID → **Desktop app**. Copy the client ID and secret.
+5. **Refresh token:** locally, set `GMAIL_CLIENT_ID` and `GMAIL_CLIENT_SECRET` in the terminal and run `python scripts/get_gmail_refresh_token.py`. Approve in the browser, and the terminal prints only the refresh token. Nothing is saved to disk.
+6. **Render env vars:** `EMAIL_PROVIDER=gmail_api`, `GMAIL_CLIENT_ID`, `GMAIL_CLIENT_SECRET`, `GMAIL_REFRESH_TOKEN`, `GMAIL_SENDER` (the Gmail address). Redeploy and run `python manage.py send_test_email <you@example.com>` in the Render shell.
+
+- [ ] **Sender address:** Gmail API mail is always sent **from the Gmail address that authorised the token** (shown as "Partner Portal <that address>"). Recipients see a personal Gmail address. Free Gmail also has a cap of about 500 recipients per day. **verify**: acceptable as an interim measure.
+- [ ] **Long-term:** switch to an **authenticated custom domain** (SPF/DKIM/DMARC) with **Brevo** (`EMAIL_PROVIDER=brevo` + `BREVO_API_KEY`) or **Resend** for better deliverability and a branded From address. **verify**: provider and domain.
 
 ## WhatsApp (if enabling)
 
@@ -39,7 +53,7 @@ This is a plain-language checklist of decisions/inputs the client must provide. 
 
 ## Security & ops
 
-- [ ] **Secrets owner:** Single owner responsible for rotating secrets (SECRET_KEY, DB password, Brevo key, OCR key, Twilio if enabled). **verify**: owner name/contact.
+- [ ] **Secrets owner:** Single owner responsible for rotating secrets (SECRET_KEY, DB password, Brevo key or Gmail OAuth client secret/refresh token, OCR key, Twilio if enabled). **verify**: owner name/contact.
 - [ ] **Superuser access:** Create initial superuser (via build.sh or locally) and restrict admin access. **verify**: who has admin access.
 - [ ] **Monitoring/logging:** Decide log retention and alerting for errors (notifications/OCR). **verify**: monitoring tool/retention.
 - [ ] **PWA:** Manifest/icons present; service worker disabled in DEBUG. Client may want custom app name/icons. **verify**: branding/icons.

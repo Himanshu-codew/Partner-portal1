@@ -223,10 +223,33 @@ SERVER_EMAIL = DEFAULT_FROM_EMAIL
 BREVO_SENDER_EMAIL = os.environ.get('BREVO_SENDER_EMAIL', '').strip()
 BREVO_SENDER_NAME = os.environ.get('BREVO_SENDER_NAME', '').strip()
 
-# With BREVO_API_KEY set, all mail goes through Brevo's HTTPS API via
-# core.email_backends.BrevoAPIEmailBackend instead of SMTP.
 BREVO_API_KEY = os.environ.get('BREVO_API_KEY', '').strip()
-if BREVO_API_KEY:
+
+# Gmail API (HTTPS) credentials, used when EMAIL_PROVIDER=gmail_api. Mail is
+# sent from GMAIL_SENDER, the Gmail account that authorised the refresh token
+# (obtain one with scripts/get_gmail_refresh_token.py).
+GMAIL_CLIENT_ID = os.environ.get('GMAIL_CLIENT_ID', '').strip()
+GMAIL_CLIENT_SECRET = os.environ.get('GMAIL_CLIENT_SECRET', '').strip()
+GMAIL_REFRESH_TOKEN = os.environ.get('GMAIL_REFRESH_TOKEN', '').strip()
+GMAIL_SENDER = os.environ.get('GMAIL_SENDER', '').strip()
+
+# EMAIL_PROVIDER picks the backend explicitly: "brevo", "gmail_api" or
+# "console". When unset, the previous behaviour applies: Brevo's HTTPS API if
+# BREVO_API_KEY is set, otherwise EMAIL_BACKEND (console in DEBUG, SMTP in prod).
+EMAIL_PROVIDER = os.environ.get('EMAIL_PROVIDER', '').strip().lower()
+if EMAIL_PROVIDER and EMAIL_PROVIDER not in ('brevo', 'gmail_api', 'console'):
+    raise ImproperlyConfigured(
+        'EMAIL_PROVIDER must be "brevo", "gmail_api" or "console", not {!r}.'.format(EMAIL_PROVIDER)
+    )
+
+if EMAIL_PROVIDER == 'gmail_api':
+    EMAIL_BACKEND = 'core.email_backends.GmailAPIEmailBackend'
+    if GMAIL_SENDER:
+        DEFAULT_FROM_EMAIL = 'Partner Portal <{}>'.format(GMAIL_SENDER)
+        SERVER_EMAIL = DEFAULT_FROM_EMAIL
+elif EMAIL_PROVIDER == 'console':
+    EMAIL_BACKEND = 'django.core.mail.backends.console.EmailBackend'
+elif EMAIL_PROVIDER == 'brevo' or BREVO_API_KEY:
     EMAIL_BACKEND = 'core.email_backends.BrevoAPIEmailBackend'
 else:
     EMAIL_BACKEND = os.environ.get(
