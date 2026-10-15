@@ -39,6 +39,7 @@ import subprocess
 import tempfile
 import threading
 import time
+from datetime import timedelta
 import uuid
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
@@ -48,6 +49,7 @@ import requests
 from django.conf import settings
 from django.core.cache import cache
 from django.db import connections
+from django.db.models import Q
 from django.utils import timezone
 
 logger = logging.getLogger('core.ocr')
@@ -361,6 +363,7 @@ class RemoteOCRProvider(OCRProvider):
     name = 'remote'
     WAKE_ATTEMPTS = 18        # GET polls while the helper wakes up ...
     WAKE_INTERVAL = 10        # ... this many seconds apart (about 3 minutes)
+    WAKE_SECONDS = 180        # and never longer than this in total
     RETRY_DELAYS = (15, 30)   # seconds before the 2nd and 3rd POST
     UNAVAILABLE = (502, 503, 504)
 
@@ -398,9 +401,12 @@ class RemoteOCRProvider(OCRProvider):
 
     def _wake(self):
         """Poll the helper's readiness GET until it answers with anything but 5xx."""
+        deadline = time.monotonic() + self.WAKE_SECONDS
         for attempt in range(self.WAKE_ATTEMPTS):
+            if time.monotonic() >= deadline:
+                break
             try:
-                response = requests.get(self.endpoint, timeout=(15, 60))
+                response = requests.get(self.endpoint, timeout=(10, 20))
                 if response.status_code not in self.UNAVAILABLE:
                     return True
             except requests.RequestException:
@@ -592,7 +598,8 @@ def process_document(document_pk):
                 return
 
         document.ocr_status = 'processing'
-        document.save(update_fields=['ocr_status'])
+        document.ocr_started_at = timezone.now()
+        document.save(update_fields=['ocr_status', 'ocr_started_at'])
 
         result = provider.extract_text(*payload)
         if metered:
@@ -628,3 +635,54 @@ def _finish(document, status, error=''):
         logger.info('OCR for document %s -> %s (%s)', document.pk, status, document.ocr_error or 'ok')
     except Exception:  # noqa: BLE001 - even the failure path must be quiet
         logger.exception('could not record OCR state for document %s', document.pk)
+
+
+# =================================================================
+# Recovery of interrupted runs
+# =================================================================
+
+AUTO_RETRY_NOTE = 'Restarted automatically after an interruption (server restart).'
+INTERRUPTED_ERROR = 'OCR was interrupted twice (server restart). Click Retry OCR.'
+
+
+def _stale_cutoff():
+    return timezone.now() - timedelta(minutes=getattr(settings, 'OCR_STALE_MINUTES', 15))
+
+
+def is_stale(document):
+    """True when a pending/processing run has been going longer than OCR_STALE_MINUTES."""
+    if document.ocr_status not in ('pending', 'processing'):
+        return False
+    started = document.ocr_started_at or document.uploaded_at
+    return bool(started and started < _stale_cutoff())
+
+
+def recover_stale_documents(documents, schedule, limit=20):
+    """Restart OCR runs that a server restart left stuck in pending/processing.
+
+    OCR runs on a daemon thread, which dies when Render restarts or redeploys
+    the service. Called when KYC pages load: a run older than
+    OCR_STALE_MINUTES is queued again once via ``schedule(pk)``; if that run
+    is interrupted too, the document is marked failed so staff can retry.
+    Each row is claimed with a conditional UPDATE, so two page loads never
+    restart the same document twice. Never raises.
+    """
+    try:
+        cutoff = _stale_cutoff()
+        stale = documents.filter(ocr_status__in=('pending', 'processing')).filter(
+            Q(ocr_started_at__lt=cutoff) | Q(ocr_started_at__isnull=True, uploaded_at__lt=cutoff)
+        )
+        model = documents.model
+        for document in list(stale.order_by('uploaded_at')[:limit]):
+            claim = model.objects.filter(
+                pk=document.pk, ocr_status=document.ocr_status, ocr_started_at=document.ocr_started_at,
+            )
+            if document.ocr_error == AUTO_RETRY_NOTE:
+                if claim.update(ocr_status='failed', ocr_error=INTERRUPTED_ERROR):
+                    logger.warning('OCR for document %s interrupted twice; marked failed', document.pk)
+                continue
+            if claim.update(ocr_status='pending', ocr_error=AUTO_RETRY_NOTE, ocr_started_at=timezone.now()):
+                logger.warning('OCR for document %s was interrupted; restarting it', document.pk)
+                schedule(document.pk)
+    except Exception:  # noqa: BLE001 - a page load must never fail because of recovery
+        logger.exception('could not recover interrupted OCR runs')

@@ -70,6 +70,9 @@ class PartnerDocument(SoftDeleteModel):
     ocr_text = models.TextField(blank=True, default='')
     extracted = models.JSONField(default=dict, blank=True)
     ocr_error = models.CharField(max_length=200, blank=True, default='')
+    # When the current OCR run was queued/started; finds runs that a server
+    # restart interrupted (see core.services.ocr.recover_stale_documents).
+    ocr_started_at = models.DateTimeField(null=True, blank=True)
 
     review_status = models.CharField(
         max_length=10, choices=REVIEW_STATUS_CHOICES, default='pending'

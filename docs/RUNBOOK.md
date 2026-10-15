@@ -49,6 +49,7 @@ From verified code (`config/settings.py`, `build.sh`):
 | `OCR_TESSERACT_LANG` | Optional | Tesseract languages (default `eng+hin`). |
 | `OCR_TESSERACT_TIMEOUT` | Optional | Seconds per Tesseract/pdftoppm step (default 120). |
 | `OCR_PDF_MAX_PAGES` | Optional | PDF pages read by Tesseract (default 5). |
+| `OCR_STALE_MINUTES` | Optional | Minutes before a stuck pending/processing OCR run is restarted (default 15). |
 | `OCR_WORKER_TOKEN` | Required for the OCR helper | Shared secret (24+ chars) on the helper and the live portal. See `docs/ocr.md`. |
 | `OCR_WORKER_ONLY` | Helper only | `True` hides every page except `/internal/ocr/`. |
 | `OCR_REMOTE_URL` / `OCR_REMOTE_TIMEOUT` | Live portal with `OCR_PROVIDER=remote` | Helper base URL; seconds to wait (default 300). |

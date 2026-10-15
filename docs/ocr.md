@@ -143,6 +143,17 @@ services in the workspace; the helper only uses hours while awake.
 | `OCR_REMOTE_URL` | live | – | Helper base URL, e.g. `https://partner-portal-ocr-test.onrender.com`. |
 | `OCR_REMOTE_TIMEOUT` | live | `300` | Seconds to wait for the helper (wake-up + OCR). |
 
+### Interrupted runs
+
+OCR runs on a background thread, which dies if Render restarts or
+redeploys the live service mid-run. Each run records `ocr_started_at`;
+when a KYC page loads (staff list, staff detail, partner list), any
+document still `pending`/`processing` after `OCR_STALE_MINUTES` (default
+15) is restarted once automatically (its note reads "Restarted
+automatically after an interruption"). If that run is interrupted too, the
+document is marked `failed` and **Retry OCR** works. Retry is also allowed
+on a `processing` document once it is stale.
+
 Alternatively, run the whole portal from the Docker image with
 `OCR_PROVIDER=tesseract` (no helper), accepting the new service URL.
 

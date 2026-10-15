@@ -324,6 +324,9 @@ OCRSPACE_API_KEY = os.environ.get('OCRSPACE_API_KEY', '').strip()
 # Upper bound on OCR.space calls per day (<= 0 means unlimited). Tesseract
 # runs are not counted.
 OCR_DAILY_LIMIT = int(os.environ.get('OCR_DAILY_LIMIT', '100'))
+# A document still pending/processing after this many minutes was interrupted
+# (server restart killed its background thread) and is restarted once.
+OCR_STALE_MINUTES = int(os.environ.get('OCR_STALE_MINUTES', '15'))
 
 # Files larger than this are downscaled client-side (images, via Pillow)
 # instead of being uploaded verbatim to OCR.space.

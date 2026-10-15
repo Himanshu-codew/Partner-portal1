@@ -16,7 +16,7 @@ from .models import PartnerProfile, PartnerDocument
 from .forms import UserForm, GroupForm, PartnerProfileForm, PartnerDocumentForm
 from .utils import get_partner_profile, user_can_access_object
 from core.services import notify
-from core.services.ocr import process_document
+from core.services.ocr import is_stale, process_document, recover_stale_documents
 
 def on_partner_approval_changed(profile):
     """
@@ -279,6 +279,7 @@ def _kyc_redirect_target(user, document):
 def kyc_document_list(request):
     """Staff: the KYC review queue. Partner: their own documents + upload."""
     if request.user.is_staff:
+        recover_stale_documents(PartnerDocument.objects.all(), _schedule_ocr)
         documents = (
             PartnerDocument.objects
             .select_related('partner', 'partner__user', 'reviewed_by')
@@ -319,6 +320,7 @@ def kyc_document_list(request):
         messages.warning(request, "Your account is waiting for administrator approval.")
         return redirect('approval_pending')
 
+    recover_stale_documents(PartnerDocument.objects.filter(partner=profile), _schedule_ocr)
     documents = PartnerDocument.objects.filter(partner=profile).order_by('-uploaded_at')
     paginator = Paginator(documents, 10)
     page_obj = paginator.get_page(request.GET.get('page'))
@@ -344,6 +346,7 @@ def kyc_document_upload(request):
 
     document = form.save(commit=False)
     document.partner = profile
+    document.ocr_started_at = timezone.now()
     document.save()
     _schedule_ocr(document.pk)
     messages.success(request, 'Document uploaded. Text extraction runs in the background.')
@@ -356,6 +359,7 @@ def kyc_document_detail(request, pk):
     if not request.user.is_staff:
         messages.error(request, 'Unauthorized access.')
         return redirect('dashboard')
+    recover_stale_documents(PartnerDocument.objects.filter(pk=pk), _schedule_ocr)
     document = get_object_or_404(
         PartnerDocument.objects.select_related('partner', 'partner__user', 'reviewed_by'),
         pk=pk,
@@ -417,13 +421,14 @@ def kyc_document_retry_ocr(request, pk):
         messages.error(request, 'Unauthorized access.')
         return redirect('kyc_document_list')
 
-    if document.ocr_status == 'processing':
+    if document.ocr_status == 'processing' and not is_stale(document):
         messages.warning(request, 'Text extraction is already running for this document.')
         return redirect(_kyc_redirect_target(request.user, document))
 
     document.ocr_status = 'pending'
     document.ocr_error = ''
-    document.save(update_fields=['ocr_status', 'ocr_error'])
+    document.ocr_started_at = timezone.now()
+    document.save(update_fields=['ocr_status', 'ocr_error', 'ocr_started_at'])
     _schedule_ocr(document.pk)
     messages.success(request, 'Retrying text extraction in the background.')
     return redirect(_kyc_redirect_target(request.user, document))
