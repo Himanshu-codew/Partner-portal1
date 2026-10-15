@@ -124,9 +124,12 @@ partner upload → live portal (Python, OCR_PROVIDER=remote)
 4. Upload a test document on the live portal; its OCR status becomes
    `done` within a minute or two (longer if the helper was asleep).
 
-A sleeping free helper takes up to a minute to wake; the request waits
-(`OCR_REMOTE_TIMEOUT`, default 300 s) and is retried once on 502/503 or a
-dropped connection. If the helper is down, documents are marked `failed`
+A sleeping free helper takes up to a minute to wake. Before uploading,
+the live portal polls `GET /internal/ocr/` every 10 s for up to 3 minutes
+until the helper answers, then POSTs the file (waiting up to
+`OCR_REMOTE_TIMEOUT`, default 300 s) and retries twice (after 15 s and
+30 s) on 502/503/504 or a dropped connection. A read timeout is not
+retried. If the helper is down, documents are marked `failed`
 and staff can use **Retry OCR** later. Roll back any time with
 `OCR_PROVIDER=ocrspace`. Free instance hours (750/month) are shared by all
 services in the workspace; the helper only uses hours while awake.

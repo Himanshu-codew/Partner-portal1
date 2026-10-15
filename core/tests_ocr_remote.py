@@ -23,6 +23,7 @@ TOKEN = 'helper-token-0123456789abcdef-not-real'
 URL = 'https://ocr-helper.example.com'
 ENDPOINT = URL + '/internal/ocr/'
 POST = 'core.services.ocr.requests.post'
+GET = 'core.services.ocr.requests.get'
 EXTRACT = 'core.services.ocr.TesseractProvider.extract_text'
 LONG_TEXT = 'INCOME TAX DEPARTMENT Permanent Account Number ABCDE1234F'
 
@@ -41,6 +42,10 @@ def fake_response(status_code=200, payload=None, text=None):
 def route_to(client):
     """requests.post stand-in that delivers the request to the Django test client."""
 
+    def _get(url, timeout=None):
+        response = client.get(url.replace(URL, ''))
+        return fake_response(response.status_code, json.loads(response.content or b'{}'))
+
     def _post(url, files=None, headers=None, timeout=None):
         name, content, content_type = files['file']
         response = client.post(
@@ -49,7 +54,13 @@ def route_to(client):
             HTTP_AUTHORIZATION=headers.get('Authorization', ''),
         )
         return fake_response(response.status_code, json.loads(response.content or b'{}'))
-    return _post
+    return _get, _post
+
+
+def routed(client):
+    """Patch requests.get/post so the helper calls reach the Django test client."""
+    _get, _post = route_to(client)
+    return mock.patch(GET, side_effect=_get), mock.patch(POST, side_effect=_post)
 
 
 # =================================================================
@@ -153,6 +164,9 @@ class RemoteOCRProviderTests(SimpleTestCase):
         sleep = mock.patch('core.services.ocr.time.sleep')
         self.sleep = sleep.start()
         self.addCleanup(sleep.stop)
+        get = mock.patch(GET, return_value=fake_response(200, {'status': 'ready', 'tesseract': True}))
+        self.get = get.start()
+        self.addCleanup(get.stop)
         self.provider = RemoteOCRProvider(URL + '/', TOKEN, timeout=300)
 
     def test_not_configured_makes_no_request(self):
@@ -185,22 +199,60 @@ class RemoteOCRProviderTests(SimpleTestCase):
         self.assertFalse(result.ok)
         self.assertIn('not installed', result.error)
 
-    def test_waking_helper_is_retried_once(self):
-        responses = [fake_response(503, text='Service Unavailable'),
+    def test_sleeping_helper_is_woken_before_upload(self):
+        self.get.side_effect = [fake_response(502, text='<!DOCTYPE html>'),
+                                requests.ConnectionError('waking'),
+                                fake_response(200, {'status': 'ready'})]
+        response = fake_response(200, {'ok': True, 'text': LONG_TEXT, 'error': ''})
+        with mock.patch(POST, return_value=response) as post:
+            result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
+        self.assertTrue(result.ok)
+        self.assertEqual(self.get.call_count, 3)
+        self.assertEqual(self.get.call_args.args[0], ENDPOINT)
+        self.assertEqual(post.call_count, 1)
+
+    def test_upload_is_still_tried_when_helper_never_wakes(self):
+        self.get.return_value = fake_response(503, text='<html>')
+        with mock.patch(POST, return_value=fake_response(200, {'ok': True, 'text': LONG_TEXT})) as post:
+            result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
+        self.assertTrue(result.ok)
+        self.assertEqual(self.get.call_count, RemoteOCRProvider.WAKE_ATTEMPTS)
+        post.assert_called_once()
+
+    def test_unavailable_helper_is_retried(self):
+        responses = [fake_response(502, text='<!DOCTYPE html>'),
+                     fake_response(503, text='Service Unavailable'),
                      fake_response(200, {'ok': True, 'text': LONG_TEXT, 'error': ''})]
         with mock.patch(POST, side_effect=responses) as post:
             result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
         self.assertTrue(result.ok)
-        self.assertEqual(post.call_count, 2)
-        self.sleep.assert_called_once()
+        self.assertEqual(post.call_count, 3)
+        self.assertEqual([c.args[0] for c in self.sleep.call_args_list], [15, 30])
+
+    def test_unavailable_error_has_no_html(self):
+        page = '<!DOCTYPE html> <html lang="en"> <head> <title>502</title>'
+        with mock.patch(POST, return_value=fake_response(502, text=page)) as post:
+            result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
+        self.assertFalse(result.ok)
+        self.assertEqual(post.call_count, 3)
+        self.assertIn('OCR helper HTTP 502', result.error)
+        self.assertIn('Retry OCR', result.error)
+        self.assertNotIn('<', result.error)
 
     def test_connection_error_is_retried_then_fails(self):
         with mock.patch(POST, side_effect=requests.ConnectionError(f'refused {TOKEN}')) as post:
             result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
         self.assertFalse(result.ok)
-        self.assertEqual(post.call_count, 2)
+        self.assertEqual(post.call_count, 3)
         self.assertIn('ConnectionError', result.error)
         self.assertNotIn(TOKEN, result.error)
+
+    def test_read_timeout_is_not_retried(self):
+        with mock.patch(POST, side_effect=requests.ReadTimeout('slow')) as post:
+            result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
+        self.assertFalse(result.ok)
+        self.assertEqual(post.call_count, 1)
+        self.assertIn('ReadTimeout', result.error)
 
     def test_unauthorised_is_not_retried(self):
         with mock.patch(POST, return_value=fake_response(401, {'ok': False, 'error': 'unauthorized'})) as post:
@@ -214,6 +266,11 @@ class RemoteOCRProviderTests(SimpleTestCase):
             result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
         self.assertFalse(result.ok)
         self.assertIn('non-JSON', result.error)
+
+    def test_html_error_page_body_is_dropped(self):
+        with mock.patch(POST, return_value=fake_response(404, text='<!DOCTYPE html><title>Not Found</title>')):
+            result = self.provider.extract_text(b'img', 'scan.png', 'image/png')
+        self.assertEqual(result.error, 'OCR helper HTTP 404')
 
     @override_settings(OCR_WORKER_TOKEN=TOKEN)
     def test_token_is_redacted_from_errors(self):
@@ -275,8 +332,8 @@ class RemoteOCREndToEndTests(BaseTestCase):
         ocr.bump_quota()  # OCR.space quota is used up; the helper is not metered
         document = make_document(self.partner_profile, content=b'\x89PNG' + b'x' * 500)
 
-        with mock.patch(POST, side_effect=route_to(Client())), \
-                mock.patch('core.services.ocr.urlopen') as urlopen:
+        get, post = routed(Client())
+        with get, post, mock.patch('core.services.ocr.urlopen') as urlopen:
             process_document(document.pk)
         document.refresh_from_db()
 
@@ -291,7 +348,8 @@ class RemoteOCREndToEndTests(BaseTestCase):
     @mock.patch(EXTRACT, return_value=OCRResult(False, '', 'tesseract timed out after 120s', 'tesseract'))
     def test_helper_failure_falls_back_to_ocrspace(self, extract):
         document = make_document(self.partner_profile)
-        with mock.patch(POST, side_effect=route_to(Client())), \
+        get, post = routed(Client())
+        with get, post, \
                 mock.patch('core.services.ocr.urlopen', return_value=FakeOCRResponse(ocr_payload(LONG_TEXT))):
             process_document(document.pk)
         document.refresh_from_db()
@@ -301,6 +359,7 @@ class RemoteOCREndToEndTests(BaseTestCase):
     def test_helper_down_marks_failed_without_crashing(self):
         document = make_document(self.partner_profile)
         with mock.patch(POST, side_effect=requests.ConnectionError('down')), \
+                mock.patch(GET, side_effect=requests.ConnectionError('down')), \
                 mock.patch('core.services.ocr.time.sleep'):
             process_document(document.pk)
         document.refresh_from_db()

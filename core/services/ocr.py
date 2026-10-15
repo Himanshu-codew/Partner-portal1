@@ -352,17 +352,26 @@ class RemoteOCRProvider(OCRProvider):
 
     POSTs the file to ``<OCR_REMOTE_URL>/internal/ocr/`` with the shared
     ``OCR_WORKER_TOKEN`` as a Bearer token. A free Render helper sleeps when
-    idle and can answer 502/503 or drop the connection while it wakes up, so
-    one retry follows a short pause. Never raises; the token is never logged.
+    idle and answers 502/503 while it wakes up or redeploys, so the helper is
+    first woken with cheap GETs (polled until it answers), then the POST is
+    retried on 502/503/504 or a dropped connection. Never raises; the token
+    and the helper's HTML error pages are never stored.
     """
 
     name = 'remote'
-    RETRY_DELAY = 10  # seconds between the two attempts
+    WAKE_ATTEMPTS = 18        # GET polls while the helper wakes up ...
+    WAKE_INTERVAL = 10        # ... this many seconds apart (about 3 minutes)
+    RETRY_DELAYS = (15, 30)   # seconds before the 2nd and 3rd POST
+    UNAVAILABLE = (502, 503, 504)
 
     def __init__(self, url='', token='', timeout=300):
         self.url = (url or '').strip().rstrip('/')
         self.token = (token or '').strip()
         self.timeout = timeout
+
+    @property
+    def endpoint(self):
+        return f'{self.url}/internal/ocr/'
 
     def extract_text(self, file_bytes, filename, content_type=''):
         if not self.url or not self.token:
@@ -370,13 +379,12 @@ class RemoteOCRProvider(OCRProvider):
                 False, '', 'OCR helper is not configured (OCR_REMOTE_URL / OCR_WORKER_TOKEN)', self.name
             )
         try:
+            self._wake()
             response = self._post(file_bytes, filename, content_type)
             if isinstance(response, OCRResult):
                 return response
             if response.status_code != 200:
-                return OCRResult(
-                    False, '', _short(f'OCR helper HTTP {response.status_code}: {response.text[:200]}'), self.name
-                )
+                return OCRResult(False, '', _short(self._http_error(response)), self.name)
             try:
                 payload = response.json()
             except ValueError:
@@ -388,26 +396,56 @@ class RemoteOCRProvider(OCRProvider):
         except Exception as exc:  # noqa: BLE001 - a provider must never raise
             return OCRResult(False, '', _short(f'OCR helper request failed: {exc}'), self.name)
 
+    def _wake(self):
+        """Poll the helper's readiness GET until it answers with anything but 5xx."""
+        for attempt in range(self.WAKE_ATTEMPTS):
+            try:
+                response = requests.get(self.endpoint, timeout=(15, 60))
+                if response.status_code not in self.UNAVAILABLE:
+                    return True
+            except requests.RequestException:
+                pass
+            if attempt < self.WAKE_ATTEMPTS - 1:
+                time.sleep(self.WAKE_INTERVAL)
+        logger.warning('OCR helper did not wake up; trying the upload anyway')
+        return False
+
     def _post(self, file_bytes, filename, content_type):
-        """POST with one retry while the helper wakes up; a response or a failed OCRResult."""
-        endpoint = f'{self.url}/internal/ocr/'
-        for attempt in (1, 2):
+        """POST with retries while the helper is unavailable; a response or a failed OCRResult."""
+        delays = list(self.RETRY_DELAYS) + [None]
+        for delay in delays:
             try:
                 response = requests.post(
-                    endpoint,
+                    self.endpoint,
                     files={'file': (filename or 'upload', file_bytes, content_type or 'application/octet-stream')},
                     headers={'Authorization': f'Bearer {self.token}'},
                     timeout=(15, self.timeout),
                 )
+            except requests.Timeout as exc:
+                # The helper took the whole timeout; running the same job again would not help.
+                return OCRResult(False, '', f'OCR helper request failed: {type(exc).__name__}', self.name)
             except requests.RequestException as exc:
-                if attempt == 1:
-                    time.sleep(self.RETRY_DELAY)
-                    continue
-                return OCRResult(False, '', _short(f'OCR helper request failed: {type(exc).__name__}'), self.name)
-            if response.status_code in (502, 503, 504) and attempt == 1:
-                time.sleep(self.RETRY_DELAY)
+                if delay is None:
+                    return OCRResult(False, '', f'OCR helper request failed: {type(exc).__name__}', self.name)
+                time.sleep(delay)
+                continue
+            if response.status_code in self.UNAVAILABLE and delay is not None:
+                time.sleep(delay)
                 continue
             return response
+
+    @classmethod
+    def _http_error(cls, response):
+        """A short error for a non-200 answer, without the body of an HTML error page."""
+        body = (response.text or '').strip()
+        if response.status_code in cls.UNAVAILABLE:
+            return (
+                f'OCR helper HTTP {response.status_code}: the helper is unavailable '
+                '(waking up, redeploying or out of memory). Try Retry OCR in a few minutes.'
+            )
+        if body.startswith('<'):
+            return f'OCR helper HTTP {response.status_code}'
+        return f'OCR helper HTTP {response.status_code}: {body[:200]}'
 
 
 def local_provider():
