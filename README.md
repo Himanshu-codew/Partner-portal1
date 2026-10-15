@@ -20,7 +20,7 @@ A Django-based partner portal for managing leads, orders and commissions, suppor
 - Bootstrap 5 + Bootstrap Icons (CDN), Chart.js.
 - PostgreSQL on Neon (production) via `DATABASE_URL` (psycopg2-binary).
 - Email: Brevo API backend (`core.email_backends.BrevoAPIEmailBackend`) when `BREVO_API_KEY` set; else SMTP.
-- OCR: OCR.space provider (`core.services.ocr`) with daemon post-commit processing, daily limits and size cap.
+- OCR: OCR.space or local Tesseract (`OCR_PROVIDER`, `core.services.ocr`) with daemon post-commit processing, daily limits and size cap. The `Dockerfile` bundles Tesseract (English + Hindi).
 - Notifications: in-DB `NotificationLog`, dedupe/quota per channel.
 - Storage: `DatabaseFileStorage` stores uploads in `core.StoredFile` (no public disk URLs).
 - Frontend: shared `static/css/portal.css`, dark mode via CSS variables, responsive/mobile polish.

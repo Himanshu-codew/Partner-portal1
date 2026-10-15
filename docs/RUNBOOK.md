@@ -42,10 +42,13 @@ From verified code (`config/settings.py`, `build.sh`):
 | `WHATSAPP_ALLOWED_NUMBERS` | Optional | Comma-separated E.164 numbers allowed to receive. |
 | `NOTIFY_WHATSAPP_DAILY_LIMIT` | Optional | WhatsApp daily cap (default 50; <=0 means unlimited in code path — verify). |
 | `OCR_ENABLED` | Optional | "true" enables OCR processing. |
-| `OCR_PROVIDER` | Optional | Default `ocrspace`. |
-| `OCRSPACE_API_KEY` | Required if OCR_ENABLED | OCR.space API key. |
-| `OCR_DAILY_LIMIT` | Optional | Daily cap (default 100). |
-| `OCR_MAX_BYTES` | Optional | Max bytes per file (default 1048576 = 1MB). |
+| `OCR_PROVIDER` | Optional | `ocrspace` (default), `tesseract` (engine on the server, needs the Docker deploy) or `hybrid` (Tesseract first, OCR.space fallback). See `docs/ocr.md`. |
+| `OCRSPACE_API_KEY` | Required for `ocrspace`; optional for `hybrid` | OCR.space API key. |
+| `OCR_DAILY_LIMIT` | Optional | OCR.space calls per day (default 100). Tesseract runs are not counted. |
+| `OCR_MAX_BYTES` | Optional | Max bytes per file sent to OCR.space (default 1048576 = 1MB). |
+| `OCR_TESSERACT_LANG` | Optional | Tesseract languages (default `eng+hin`). |
+| `OCR_TESSERACT_TIMEOUT` | Optional | Seconds per Tesseract/pdftoppm step (default 120). |
+| `OCR_PDF_MAX_PAGES` | Optional | PDF pages read by Tesseract (default 5). |
 | `SECURE_HSTS_SECONDS` | Optional | HSTS max-age in non-DEBUG (default 3600). |
 | `DJANGO_SUPERUSER_USERNAME/PASSWORD/EMAIL` | Optional | Used by `build.sh` to create superuser on build (createsuperuser --noinput). |
 
@@ -155,6 +158,8 @@ To switch back to Brevo, set `EMAIL_PROVIDER=brevo` (or clear it) and make sure 
 | Notifications skipped `not configured` / `whatsapp notifications disabled` | WhatsApp needs `WHATSAPP_ENABLED=True` **and** configured provider credentials **and** per-partner opt-in. Run `python manage.py send_test_whatsapp +91...` to see the exact missing variable. |
 | WhatsApp `number not in allowed list` for a valid number | Format difference in `WHATSAPP_ALLOWED_NUMBERS`. Entries are normalised now, but keep them E.164 (`+91...`) to be safe. |
 | OCR.space errors / quota | `OCR_ENABLED` true but key missing/invalid, or `OCR_DAILY_LIMIT` reached, or file > `OCR_MAX_BYTES`. Check logs and limits. |
+| OCR failed `Tesseract is not installed on this server` | `OCR_PROVIDER=tesseract` on the native Python deploy. Tesseract exists only in the Docker image; deploy with the `Dockerfile` (see `docs/ocr.md`) or set `OCR_PROVIDER=ocrspace`/`hybrid`. |
+| OCR failed `tesseract timed out after 120s` | Slow free-tier CPU or a very large/multi-page file. Raise `OCR_TESSERACT_TIMEOUT` or lower `OCR_PDF_MAX_PAGES`, then **Retry OCR**. |
 | WhatsApp sandbox restrictions | Twilio sandbox only accepts joined numbers/templates; 360dialog sandbox allows one fixed recipient, few messages and templates only for business-initiated sends. Channel disabled by default. |
 | Inbound webhook 404 | `D360_WEBHOOK_TOKEN` unset or URL token does not match `D360_WEBHOOK_TOKEN`. Set the env var and re-register via `d360_set_webhook`. |
 | Inbound webhook not matching a partner | Sender number not an approved partner's `whatsapp_number` (E.164), or the partner has not opted in. Check the `InboundWhatsAppMessage` row's `status`. |

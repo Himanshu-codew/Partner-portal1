@@ -52,7 +52,7 @@ URLs order: core PWA/search/recycle/notifications first, then app includes, then
 `core.services.ocr`:
 - Provider interface returns `OCRResult` (never raises). API key only in request header; stripped from logs/errors.
 - Post-commit processing: `process_document(document_id)` starts a daemon thread after upload transaction commits (no worker process on Render free tier). Thread closes DB connections when done.
-- Gated by `OCR_ENABLED` (default False). Provider `ocrspace` (default). Daily limit `OCR_DAILY_LIMIT` (100), max bytes `OCR_MAX_BYTES` (1MB default). Status flow tracked on `PartnerDocument.ocr_status`/timestamps.
+- Gated by `OCR_ENABLED` (default False). Provider `ocrspace` (default), `tesseract` (local engine, Docker deploy only) or `hybrid` (Tesseract, OCR.space fallback); local runs are serialised by a lock and do not count toward the daily limit. Daily limit `OCR_DAILY_LIMIT` (100), max bytes `OCR_MAX_BYTES` (1MB default). Status flow tracked on `PartnerDocument.ocr_status`/timestamps.
 - Privacy: Aadhaar numbers masked out of `ocr_text` before storing (comment in model); OCR output are suggestions only (never auto-written back).
 - Errors short and redacted.
 

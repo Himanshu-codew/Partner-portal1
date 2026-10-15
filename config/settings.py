@@ -315,15 +315,24 @@ D360_WEBHOOK_TOKEN = os.environ.get('D360_WEBHOOK_TOKEN', '').strip()
 # provided. Uploads still work when disabled — they are just marked
 # "skipped" so a reviewer can key in the details manually.
 OCR_ENABLED = os.environ.get('OCR_ENABLED', 'False').lower() in ('true', '1', 't', 'yes')
+# "ocrspace" (OCR.space API, default), "tesseract" (engine on this server,
+# needs the Docker image) or "hybrid" (Tesseract, OCR.space as fallback).
 OCR_PROVIDER = os.environ.get('OCR_PROVIDER', 'ocrspace').strip() or 'ocrspace'
 OCRSPACE_API_KEY = os.environ.get('OCRSPACE_API_KEY', '').strip()
 
-# Upper bound on OCR calls per day (<= 0 means unlimited).
+# Upper bound on OCR.space calls per day (<= 0 means unlimited). Tesseract
+# runs are not counted.
 OCR_DAILY_LIMIT = int(os.environ.get('OCR_DAILY_LIMIT', '100'))
 
 # Files larger than this are downscaled client-side (images, via Pillow)
-# instead of being uploaded verbatim to the OCR provider.
+# instead of being uploaded verbatim to OCR.space.
 OCR_MAX_BYTES = int(os.environ.get('OCR_MAX_BYTES', str(1024 * 1024)))
+
+# Tesseract: languages (installed traineddata), per-step timeout in seconds
+# and how many PDF pages are read.
+OCR_TESSERACT_LANG = os.environ.get('OCR_TESSERACT_LANG', 'eng+hin').strip() or 'eng+hin'
+OCR_TESSERACT_TIMEOUT = int(os.environ.get('OCR_TESSERACT_TIMEOUT', '120'))
+OCR_PDF_MAX_PAGES = int(os.environ.get('OCR_PDF_MAX_PAGES', '5'))
 
 
 # ─────────────────────────────────────────────────────────────

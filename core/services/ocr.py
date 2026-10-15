@@ -13,13 +13,27 @@ Design rules:
     commits (``process_document``), because Render's free tier has no
     worker process. The thread closes its DB connection when done.
   * Everything is off until ``OCR_ENABLED`` is turned on in the environment.
+
+Providers (``OCR_PROVIDER``):
+  * ``ocrspace`` (default) — the OCR.space HTTP API. Metered: counts against
+    ``OCR_DAILY_LIMIT`` and is limited to ``OCR_MAX_BYTES`` per file.
+  * ``tesseract`` — the Tesseract engine installed on the same server (see
+    the Dockerfile). No API key, no daily limit, files never leave the
+    server. PDFs are rendered to images with poppler's ``pdftoppm``.
+  * ``hybrid`` — Tesseract first; OCR.space only when Tesseract finds little
+    or no text and the daily quota still has room.
 """
 
+import glob
 import io
 import json
 import logging
 import mimetypes
 import os
+import shutil
+import subprocess
+import tempfile
+import threading
 import uuid
 from dataclasses import dataclass
 from urllib.error import HTTPError, URLError
@@ -36,6 +50,14 @@ OCRSPACE_ENDPOINT = 'https://api.ocr.space/parse/image'
 DEFAULT_TIMEOUT = 25          # seconds per spec
 MAX_TEXT = 20000              # characters of OCR text we keep per document
 QUOTA_TTL = 60 * 60 * 24      # lifetime of the daily counter
+METERED_PROVIDERS = {'ocrspace'}  # providers that consume OCR_DAILY_LIMIT
+HYBRID_MIN_CHARS = 20         # less local text than this triggers the fallback
+LOCAL_MAX_SIDE = 2500         # px; larger images are shrunk before Tesseract
+PDF_RENDER_DPI = 200
+
+# Tesseract needs ~100-200 MB per run; Render's free plan has 512 MB, so only
+# one local OCR job runs at a time. Others wait their turn on this lock.
+_local_ocr_lock = threading.Lock()
 
 
 @dataclass
@@ -175,15 +197,165 @@ class OCRSpaceProvider(OCRProvider):
         return OCRResult(True, text[:MAX_TEXT], '', 'ocrspace')
 
 
+class TesseractProvider(OCRProvider):
+    """Text extraction with the Tesseract binary on this server.
+
+    Runs ``tesseract`` (and ``pdftoppm`` for PDFs) as subprocesses with a
+    timeout, inside a temporary directory that is always removed. Only one
+    job runs at a time (``_local_ocr_lock``) to stay within free-tier memory.
+    Never raises: a missing binary, timeout or bad file is a failed result.
+    """
+
+    name = 'tesseract'
+
+    def __init__(self, lang='eng+hin', timeout=120, max_pages=5):
+        self.lang = (lang or 'eng').strip()
+        self.timeout = timeout
+        self.max_pages = max(1, int(max_pages or 1))
+
+    def extract_text(self, file_bytes, filename, content_type=''):
+        try:
+            if not shutil.which('tesseract'):
+                return OCRResult(False, '', 'Tesseract is not installed on this server', self.name)
+            with _local_ocr_lock, tempfile.TemporaryDirectory(prefix='ocr-') as workdir:
+                if self._is_pdf(file_bytes, filename, content_type):
+                    pages = self._render_pdf(file_bytes, workdir)
+                    if isinstance(pages, OCRResult):
+                        return pages
+                else:
+                    pages = [self._write_image(file_bytes, filename, workdir)]
+
+                chunks = []
+                for page in pages:
+                    result = self._run(['tesseract', page, 'stdout', '-l', self.lang])
+                    if isinstance(result, OCRResult):
+                        return result
+                    if result.strip():
+                        chunks.append(result.strip())
+            text = '\n'.join(chunks).strip()
+            return OCRResult(True, text[:MAX_TEXT], '', self.name)
+        except Exception as exc:  # noqa: BLE001 - a provider must never raise
+            return OCRResult(False, '', _short(f'tesseract failed: {exc}'), self.name)
+
+    @staticmethod
+    def _is_pdf(file_bytes, filename, content_type):
+        return (
+            (content_type or '').lower() == 'application/pdf'
+            or (filename or '').lower().endswith('.pdf')
+            or file_bytes[:5] == b'%PDF-'
+        )
+
+    def _render_pdf(self, file_bytes, workdir):
+        """Render up to ``max_pages`` PDF pages to PNG files in ``workdir``."""
+        if not shutil.which('pdftoppm'):
+            return OCRResult(False, '', 'pdftoppm (poppler) is not installed on this server', self.name)
+        source = os.path.join(workdir, 'input.pdf')
+        with open(source, 'wb') as handle:
+            handle.write(file_bytes)
+        result = self._run([
+            'pdftoppm', '-r', str(PDF_RENDER_DPI), '-png',
+            '-f', '1', '-l', str(self.max_pages),
+            source, os.path.join(workdir, 'page'),
+        ])
+        if isinstance(result, OCRResult):
+            return result
+        pages = sorted(glob.glob(os.path.join(workdir, 'page*.png')))
+        if not pages:
+            return OCRResult(False, '', 'PDF has no readable pages', self.name)
+        return pages
+
+    @staticmethod
+    def _write_image(file_bytes, filename, workdir):
+        """Save the image for Tesseract, shrinking huge photos when Pillow is available."""
+        extension = os.path.splitext(filename or '')[1].lower() or '.png'
+        path = os.path.join(workdir, 'input' + extension)
+        try:
+            from PIL import Image  # optional dependency
+            image = Image.open(io.BytesIO(file_bytes))
+            if max(image.size) > LOCAL_MAX_SIDE:
+                image = image.convert('RGB')
+                image.thumbnail((LOCAL_MAX_SIDE, LOCAL_MAX_SIDE))
+                path = os.path.join(workdir, 'input.png')
+                image.save(path, format='PNG')
+                return path
+        except Exception:  # noqa: BLE001 - Pillow missing or unreadable: use the bytes as-is
+            pass
+        with open(path, 'wb') as handle:
+            handle.write(file_bytes)
+        return path
+
+    def _run(self, command):
+        """Run one subprocess; return its stdout, or a failed OCRResult."""
+        tool = command[0]
+        env = dict(os.environ, OMP_THREAD_LIMIT='1')  # keep CPU/memory use low
+        try:
+            completed = subprocess.run(
+                command, capture_output=True, timeout=self.timeout, env=env, check=False,
+            )
+        except subprocess.TimeoutExpired:
+            return OCRResult(False, '', f'{tool} timed out after {self.timeout}s', self.name)
+        except OSError as exc:
+            return OCRResult(False, '', _short(f'{tool} could not start: {exc}'), self.name)
+        if completed.returncode != 0:
+            detail = completed.stderr.decode('utf-8', 'replace') if completed.stderr else ''
+            return OCRResult(False, '', _short(f'{tool} failed: {detail}'), self.name)
+        return completed.stdout.decode('utf-8', 'replace') if completed.stdout else ''
+
+
+class HybridProvider(OCRProvider):
+    """Tesseract first; OCR.space only as a fallback while quota remains.
+
+    The fallback runs when Tesseract fails or returns fewer than
+    ``HYBRID_MIN_CHARS`` characters, OCR.space has an API key, the daily
+    quota has room and the file fits (or can be shrunk to) ``OCR_MAX_BYTES``.
+    Otherwise the Tesseract result is returned as it is.
+    """
+
+    name = 'hybrid'
+
+    def __init__(self, local, remote):
+        self.local = local
+        self.remote = remote
+
+    def extract_text(self, file_bytes, filename, content_type=''):
+        result = self.local.extract_text(file_bytes, filename, content_type)
+        if result.ok and len(result.text.strip()) >= HYBRID_MIN_CHARS:
+            return result
+        if not self.remote.api_key or not quota_available():
+            return result
+
+        payload = _fit_to_size(
+            file_bytes, filename, content_type, getattr(settings, 'OCR_MAX_BYTES', 1048576)
+        )
+        if payload is None:
+            return result
+        fallback = self.remote.extract_text(*payload)
+        bump_quota()
+        if fallback.ok and len(fallback.text.strip()) >= len(result.text.strip()):
+            return fallback
+        if result.ok:
+            return result
+        return OCRResult(False, '', f'{result.error}; fallback: {fallback.error}', self.name)
+
+
 def get_provider():
     """Return the configured provider, or ``None`` when OCR is off."""
     if not getattr(settings, 'OCR_ENABLED', False):
         return None
     name = (getattr(settings, 'OCR_PROVIDER', 'ocrspace') or 'ocrspace').strip().lower()
-    if name != 'ocrspace':
-        logger.warning('unsupported OCR provider requested: %s', _redact(name))
-        return None
-    return OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', ''))
+    if name == 'ocrspace':
+        return OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', ''))
+    if name in ('tesseract', 'hybrid'):
+        local = TesseractProvider(
+            lang=getattr(settings, 'OCR_TESSERACT_LANG', 'eng+hin'),
+            timeout=getattr(settings, 'OCR_TESSERACT_TIMEOUT', 120),
+            max_pages=getattr(settings, 'OCR_PDF_MAX_PAGES', 5),
+        )
+        if name == 'tesseract':
+            return local
+        return HybridProvider(local, OCRSpaceProvider(getattr(settings, 'OCRSPACE_API_KEY', '')))
+    logger.warning('unsupported OCR provider requested: %s', _redact(name))
+    return None
 
 
 def quota_available():
@@ -205,6 +377,13 @@ def bump_quota():
 
 def _quota_key():
     return f'ocr:count:{timezone.localdate().isoformat()}'
+
+
+def _fit_to_size(file_bytes, filename, content_type, max_bytes):
+    """Return ``(bytes, filename, content_type)`` within ``max_bytes``, or ``None``."""
+    if len(file_bytes) <= max_bytes:
+        return file_bytes, filename, content_type
+    return _downscale_image(file_bytes, filename, content_type)
 
 
 def _downscale_image(file_bytes, filename, content_type):
@@ -256,7 +435,8 @@ def process_document(document_pk):
             reason = 'OCR is not enabled' if not getattr(settings, 'OCR_ENABLED', False) else 'OCR is not configured'
             _finish(document, 'skipped', reason)
             return
-        if not quota_available():
+        metered = provider.name in METERED_PROVIDERS
+        if metered and not quota_available():
             _finish(document, 'skipped', 'daily OCR limit reached')
             return
         if not document.file:
@@ -276,20 +456,20 @@ def process_document(document_pk):
                 content_type = ''
         content_type = content_type or mimetypes.guess_type(filename)[0] or ''
 
-        payload, payload_name, payload_type = file_bytes, filename, content_type
-        max_bytes = getattr(settings, 'OCR_MAX_BYTES', 1048576)
-        if len(file_bytes) > max_bytes:
-            shrunk = _downscale_image(file_bytes, filename, content_type)
-            if shrunk is None:
+        payload = (file_bytes, filename, content_type)
+        if metered:
+            # Local providers read the whole upload; the hosted API has a size cap.
+            payload = _fit_to_size(*payload, getattr(settings, 'OCR_MAX_BYTES', 1048576))
+            if payload is None:
                 _finish(document, 'skipped', 'file larger than 1 MB, enter details manually')
                 return
-            payload, payload_name, payload_type = shrunk
 
         document.ocr_status = 'processing'
         document.save(update_fields=['ocr_status'])
 
-        result = provider.extract_text(payload, payload_name, payload_type)
-        bump_quota()
+        result = provider.extract_text(*payload)
+        if metered:
+            bump_quota()
         if not result.ok:
             _finish(document, 'failed', result.error or 'OCR failed')
             return
