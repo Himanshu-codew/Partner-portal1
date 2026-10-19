@@ -20,9 +20,43 @@ Notes (verified):
 - It prints the record count and file size; **it never prints the database URL**.
 - It uses `dumpdata --all --natural-foreign --natural-primary` and excludes `contenttypes`, `auth.permission`, `admin.logentry`, `sessions`.
 
-## Taking a backup from Render (cron job)
+## Automatic weekly backup (GitHub Actions)
 
-You can run `python manage.py backup_data --output /tmp/partner_backup_YYYYMMDDTHHMMSSZ.json` in a cron job and upload it to an external storage (S3/Cloudinary/private bucket). The app's file system is ephemeral on free Render — do **not** store backups inside the app filesystem long-term.
+`.github/workflows/backup.yml` runs every Monday 02:00 IST (and on demand
+from **Actions → Database backup → Run workflow**). It runs `backup_data`
+against production, gzips the JSON, encrypts it with AES-256 (OpenSSL,
+PBKDF2, 600k iterations) using `BACKUP_PASSPHRASE`, checks that it decrypts
+back to valid JSON, and keeps **only the encrypted file** as a workflow
+artifact for 35 days (about five weekly generations). Uploaded files are
+included, because they are stored in the database (`core.StoredFile`).
+
+One-time setup (GitHub → repository → **Settings → Secrets and variables →
+Actions → New repository secret**):
+
+| Secret | Value |
+|---|---|
+| `DATABASE_URL` | The Neon connection string (same as on Render). |
+| `BACKUP_PASSPHRASE` | 16+ characters, e.g. `python -c "import secrets; print(secrets.token_urlsafe(24))"`. **Keep a copy outside GitHub** (password manager): without it the backups cannot be opened, and GitHub never shows a secret again. |
+
+Then run the workflow once by hand and check that it is green and lists an
+artifact `partner-backup-<n>`. A missing secret fails the run with a clear
+message; GitHub emails the repository owner when a scheduled run fails.
+
+### Restoring from an automatic backup
+
+1. GitHub → **Actions → Database backup** → a green run → download the
+   artifact (a zip) and unzip it outside the repository.
+2. Decrypt it (Git Bash on Windows; asks for the backup password):
+   ```bash
+   bash scripts/decrypt-backup.sh partner_backup_<stamp>.json.gz.enc
+   ```
+   This writes `partner_backup_<stamp>.json`. A wrong password stops with
+   "Decryption failed" and writes nothing.
+3. Follow **Restoring into an empty database** below with that JSON file.
+
+Verified locally: encrypt → decrypt → `loaddata` into an empty database
+restored users (passwords still work), partner profiles and KYC files
+byte-for-byte; a wrong password is rejected.
 
 ## Restoring into an empty database
 
